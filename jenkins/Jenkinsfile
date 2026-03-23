@@ -10,8 +10,6 @@ pipeline {
         DOCKER_IMAGE     = 'prasanth631/devops-platform'
         FRONTEND_IMAGE   = 'prasanth631/devops-frontend'
         DOCKER_CREDS     = credentials('dockerhub-credentials')
-        SONARQUBE_TOKEN  = credentials('sonarqube-token')
-        KUBECONFIG_CRED  = credentials('kubeconfig-credential')
         WEBHOOK_URL      = 'http://localhost:8082/api/webhook/jenkins'
     }
 
@@ -70,10 +68,12 @@ pipeline {
                 notifyWebhook('Static Analysis', 'IN_PROGRESS')
                 dir('backend') {
                     withSonarQubeEnv('SonarQube') {
-                        bat """mvn sonar:sonar \
-                            -Dsonar.projectKey=devops-platform \
-                            -Dsonar.projectName="DevOps Platform" \
-                            -Dsonar.token=%SONARQUBE_TOKEN%"""
+                        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                            bat """mvn sonar:sonar \
+                                -Dsonar.projectKey=devops-platform \
+                                -Dsonar.projectName="DevOps Platform" \
+                                -Dsonar.token=%SONAR_TOKEN%"""
+                        }
                     }
                 }
                 notifyWebhook('Static Analysis', 'SUCCESS')
