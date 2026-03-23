@@ -1,0 +1,119 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_count{application=\"devops-platform\"}[5m])",
+          "legendFormat": "{{uri}} - {{method}}"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Error Rate (4xx/5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_count{application=\"devops-platform\",status=~\"4..|5..\"}[5m])",
+          "legendFormat": "{{status}} {{uri}}"
+        }
+      ]
+    },
+    {
+      "title": "JVM Heap Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{application=\"devops-platform\",area=\"heap\"}",
+          "legendFormat": "{{id}} - Used"
+        },
+        {
+          "expr": "jvm_memory_max_bytes{application=\"devops-platform\",area=\"heap\"}",
+          "legendFormat": "{{id}} - Max"
+        }
+      ]
+    },
+    {
+      "title": "Response Latency Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_server_requests_seconds_bucket{application=\"devops-platform\"}[5m]))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{application=\"devops-platform\"}[5m]))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{application=\"devops-platform\"}[5m]))",
+          "legendFormat": "P99"
+        }
+      ]
+    },
+    {
+      "title": "Build Count Per Day",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "increase(build_total{application=\"devops-platform\"}[24h])",
+          "legendFormat": "Builds Today"
+        }
+      ]
+    },
+    {
+      "title": "Login Attempts",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+      "targets": [
+        {
+          "expr": "login_attempts_total{application=\"devops-platform\"}",
+          "legendFormat": "Total Attempts"
+        }
+      ]
+    },
+    {
+      "title": "Login Failures",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "login_failures_total{application=\"devops-platform\"}",
+          "legendFormat": "Failed Logins"
+        }
+      ]
+    },
+    {
+      "title": "JVM Thread Count",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads{application=\"devops-platform\"}",
+          "legendFormat": "Live Threads"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["devops", "spring-boot", "pipeline"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "DevOps Intelligence Platform",
+  "uid": "devops-platform-dashboard",
+  "version": 1
+}

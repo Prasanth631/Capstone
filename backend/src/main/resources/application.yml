@@ -1,0 +1,50 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: devops-platform
+
+  # Default profile: dev (H2 in-memory)
+  profiles:
+    active: dev
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:myDefaultSuperSecretKeyForDevEnvironmentThatIsAtLeast256BitsLong2024!}
+  expiration: 86400000  # 24 hours in milliseconds
+
+# Firebase Configuration
+firebase:
+  config-path: ${FIREBASE_CONFIG_PATH:firebase-service-account.json}
+
+# Actuator & Prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+
+# CORS
+app:
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:3000

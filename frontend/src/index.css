@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
+  }
+  *::-webkit-scrollbar { width: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 3px; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl;
+  }
+  .glass-card-hover {
+    @apply glass-card hover:bg-white/10 hover:border-primary-400/30 transition-all duration-300;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-400 to-purple-400 bg-clip-text text-transparent;
+  }
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .status-success { @apply status-badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }
+  .status-failure { @apply status-badge bg-red-500/20 text-red-400 border border-red-500/30; }
+  .status-pending { @apply status-badge bg-yellow-500/20 text-yellow-400 border border-yellow-500/30; }
+  .status-running { @apply status-badge bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse; }
+
+  .glow {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05);
+  }
+  .glow-success {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+  }
+  .glow-danger {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+  }
+}

@@ -1,0 +1,265 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'MAVEN_HOME'
+        jdk 'JDK22'
+    }
+
+    environment {
+        DOCKER_IMAGE     = 'prasanth631/devops-platform'
+        FRONTEND_IMAGE   = 'prasanth631/devops-frontend'
+        DOCKER_CREDS     = credentials('dockerhub-credentials')
+        SONARQUBE_TOKEN  = credentials('sonarqube-token')
+        KUBECONFIG_CRED  = credentials('kubeconfig-credential')
+        WEBHOOK_URL      = 'http://localhost:8082/api/webhook/jenkins'
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        // ===== STAGE 1: Checkout =====
+        stage('Checkout') {
+            steps {
+                notifyWebhook('Checkout', 'IN_PROGRESS')
+                checkout scm
+                notifyWebhook('Checkout', 'SUCCESS')
+            }
+        }
+
+        // ===== STAGE 2: Build =====
+        stage('Build') {
+            steps {
+                notifyWebhook('Build', 'IN_PROGRESS')
+                dir('backend') {
+                    bat 'mvn clean package -DskipTests -B'
+                }
+                notifyWebhook('Build', 'SUCCESS')
+            }
+        }
+
+        // ===== STAGE 3: Unit & Integration Tests =====
+        stage('Unit & Integration Tests') {
+            steps {
+                notifyWebhook('Unit & Integration Tests', 'IN_PROGRESS')
+                dir('backend') {
+                    bat 'mvn test -B'
+                }
+                notifyWebhook('Unit & Integration Tests', 'SUCCESS')
+            }
+            post {
+                always {
+                    dir('backend') {
+                        junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                        jacoco execPattern: '**/target/jacoco.exec'
+                    }
+                }
+                failure {
+                    notifyWebhook('Unit & Integration Tests', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 4: Static Analysis (SonarQube) =====
+        stage('Static Analysis') {
+            steps {
+                notifyWebhook('Static Analysis', 'IN_PROGRESS')
+                dir('backend') {
+                    withSonarQubeEnv('SonarQube') {
+                        bat """mvn sonar:sonar \
+                            -Dsonar.projectKey=devops-platform \
+                            -Dsonar.projectName="DevOps Platform" \
+                            -Dsonar.token=%SONARQUBE_TOKEN%"""
+                    }
+                }
+                notifyWebhook('Static Analysis', 'SUCCESS')
+            }
+            post {
+                failure {
+                    notifyWebhook('Static Analysis', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 5: API Tests (Newman/Postman) =====
+        stage('API Tests') {
+            steps {
+                notifyWebhook('API Tests', 'IN_PROGRESS')
+                bat """npx newman run postman/DevOps-Platform.postman_collection.json \
+                    -e postman/environments/dev.postman_environment.json \
+                    --reporters cli,junit \
+                    --reporter-junit-export target/newman-results.xml"""
+                notifyWebhook('API Tests', 'SUCCESS')
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'target/newman-results.xml'
+                }
+                failure {
+                    notifyWebhook('API Tests', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 6: Docker Build & Push =====
+        stage('Docker Build & Push') {
+            steps {
+                notifyWebhook('Docker Build & Push', 'IN_PROGRESS')
+
+                // Backend Docker image
+                dir('backend') {
+                    bat """docker build -t %DOCKER_IMAGE%:%BUILD_NUMBER% -t %DOCKER_IMAGE%:latest ."""
+                }
+
+                // Frontend Docker image
+                dir('frontend') {
+                    bat """docker build -t %FRONTEND_IMAGE%:%BUILD_NUMBER% -t %FRONTEND_IMAGE%:latest ."""
+                }
+
+                // Push to Docker Hub
+                bat """docker login -u %DOCKER_CREDS_USR% -p %DOCKER_CREDS_PSW%
+                       docker push %DOCKER_IMAGE%:%BUILD_NUMBER%
+                       docker push %DOCKER_IMAGE%:latest
+                       docker push %FRONTEND_IMAGE%:%BUILD_NUMBER%
+                       docker push %FRONTEND_IMAGE%:latest"""
+
+                notifyWebhook('Docker Build & Push', 'SUCCESS')
+            }
+            post {
+                failure {
+                    notifyWebhook('Docker Build & Push', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 7: Deploy to Dev =====
+        stage('Deploy to Dev') {
+            steps {
+                notifyWebhook('Deploy to Dev', 'IN_PROGRESS')
+                withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                    bat """kubectl apply -f k8s/dev/ --kubeconfig=%KUBECONFIG%
+                           kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n dev --kubeconfig=%KUBECONFIG%
+                           kubectl rollout status deployment/devops-platform -n dev --timeout=120s --kubeconfig=%KUBECONFIG%"""
+                }
+                notifyWebhook('Deploy to Dev', 'SUCCESS')
+            }
+            post {
+                failure {
+                    notifyWebhook('Deploy to Dev', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 8: Smoke Test =====
+        stage('Smoke Test') {
+            steps {
+                notifyWebhook('Smoke Test', 'IN_PROGRESS')
+                script {
+                    def response = bat(script: 'curl -s -o NUL -w "%%{http_code}" http://localhost:8082/actuator/health', returnStdout: true).trim()
+                    if (response != '200') {
+                        error("Smoke test failed! Health endpoint returned: ${response}")
+                    }
+                }
+                notifyWebhook('Smoke Test', 'SUCCESS')
+            }
+            post {
+                failure {
+                    notifyWebhook('Smoke Test', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 9: Deploy to Staging =====
+        stage('Deploy to Staging') {
+            steps {
+                notifyWebhook('Deploy to Staging', 'IN_PROGRESS')
+                withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                    bat """kubectl apply -f k8s/staging/ --kubeconfig=%KUBECONFIG%
+                           kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n staging --kubeconfig=%KUBECONFIG%
+                           kubectl rollout status deployment/devops-platform -n staging --timeout=120s --kubeconfig=%KUBECONFIG%"""
+                }
+                notifyWebhook('Deploy to Staging', 'SUCCESS')
+            }
+            post {
+                failure {
+                    notifyWebhook('Deploy to Staging', 'FAILURE')
+                }
+            }
+        }
+
+        // ===== STAGE 10: Manual Approval =====
+        stage('Manual Approval') {
+            steps {
+                notifyWebhook('Manual Approval', 'IN_PROGRESS')
+                input message: 'Deploy to Production?', ok: 'Approve'
+                notifyWebhook('Manual Approval', 'SUCCESS')
+            }
+        }
+
+        // ===== STAGE 11: Deploy to Production =====
+        stage('Deploy to Production') {
+            steps {
+                notifyWebhook('Deploy to Production', 'IN_PROGRESS')
+                withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                    bat """kubectl apply -f k8s/production/ --kubeconfig=%KUBECONFIG%
+                           kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n production --kubeconfig=%KUBECONFIG%
+                           kubectl rollout status deployment/devops-platform -n production --timeout=180s --kubeconfig=%KUBECONFIG%"""
+                }
+                notifyWebhook('Deploy to Production', 'SUCCESS')
+            }
+            post {
+                failure {
+                    notifyWebhook('Deploy to Production', 'FAILURE')
+                    // Rollback
+                    withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                        bat 'kubectl rollout undo deployment/devops-platform -n production --kubeconfig=%KUBECONFIG%'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
+
+// ───── Helper: Send webhook notification to Spring Boot ─────
+def notifyWebhook(String stageName, String status) {
+    try {
+        def payload = """{
+            "buildNumber": ${env.BUILD_NUMBER},
+            "jobName": "${env.JOB_NAME}",
+            "stage": "${stageName}",
+            "status": "${status}",
+            "duration": ${currentBuild.duration},
+            "gitBranch": "${env.GIT_BRANCH ?: 'unknown'}",
+            "gitCommit": "${env.GIT_COMMIT ?: 'unknown'}",
+            "triggerType": "${currentBuild.getBuildCauses()[0]?.shortDescription ?: 'unknown'}",
+            "timestamp": ${System.currentTimeMillis()}
+        }"""
+
+        httpRequest(
+            url: env.WEBHOOK_URL,
+            httpMode: 'POST',
+            contentType: 'APPLICATION_JSON',
+            requestBody: payload,
+            validResponseCodes: '200:299',
+            quiet: true
+        )
+    } catch (Exception e) {
+        echo "Webhook notification failed for ${stageName}: ${e.message}"
+    }
+}
