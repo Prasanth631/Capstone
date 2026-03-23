@@ -231,7 +231,7 @@ pipeline {
             echo 'Pipeline failed!'
         }
         always {
-            cleanWs()
+            echo 'Pipeline execution finished.'
         }
     }
 }
