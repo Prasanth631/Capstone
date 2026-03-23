@@ -7,10 +7,11 @@ pipeline {
     }
 
     environment {
-        DOCKER_IMAGE     = 'prasanth631/devops-platform'
-        FRONTEND_IMAGE   = 'prasanth631/devops-frontend'
-        DOCKER_CREDS     = credentials('dockerhub-credentials')
-        WEBHOOK_URL      = 'http://localhost:8082/api/webhook/jenkins'
+        DOCKER_IMAGE       = 'prasanth631/devops-platform'
+        FRONTEND_IMAGE     = 'prasanth631/devops-frontend'
+        DOCKER_CREDS       = credentials('dockerhub-credentials')
+        WEBHOOK_URL        = 'http://localhost:8082/api/webhook/jenkins'
+        DOCKER_BUILDKIT    = '1'   // Enable BuildKit for faster, parallel layer builds
     }
 
     options {
@@ -107,9 +108,9 @@ pipeline {
             steps {
                 notifyWebhook('Deploy to Dev', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl apply -f k8s/dev/ --kubeconfig=%KUBECONFIG%"
-                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n dev --kubeconfig=%KUBECONFIG%"
-                    bat "kubectl rollout status deployment/devops-platform -n dev --timeout=180s --kubeconfig=%KUBECONFIG%"
+                    bat "kubectl apply -f k8s/dev/ --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n dev --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n dev --timeout=180s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Dev', 'SUCCESS')
             }
@@ -125,7 +126,7 @@ pipeline {
             steps {
                 notifyWebhook('Smoke Test', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl wait --for=condition=ready pod -l app=devops-platform -n dev --timeout=120s --kubeconfig=%KUBECONFIG%"
+                    bat "kubectl wait --for=condition=ready pod -l app=devops-platform -n dev --timeout=120s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Smoke Test', 'SUCCESS')
             }
@@ -141,9 +142,9 @@ pipeline {
             steps {
                 notifyWebhook('Deploy to Staging', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl apply -f k8s/staging/ --kubeconfig=%KUBECONFIG%"
-                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n staging --kubeconfig=%KUBECONFIG%"
-                    bat "kubectl rollout status deployment/devops-platform -n staging --timeout=180s --kubeconfig=%KUBECONFIG%"
+                    bat "kubectl apply -f k8s/staging/ --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n staging --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n staging --timeout=180s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Staging', 'SUCCESS')
             }
@@ -168,9 +169,9 @@ pipeline {
             steps {
                 notifyWebhook('Deploy to Production', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl apply -f k8s/production/ --kubeconfig=%KUBECONFIG%"
-                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n production --kubeconfig=%KUBECONFIG%"
-                    bat "kubectl rollout status deployment/devops-platform -n production --timeout=300s --kubeconfig=%KUBECONFIG%"
+                    bat "kubectl apply -f k8s/production/ --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n production --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n production --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Production', 'SUCCESS')
             }
@@ -179,7 +180,7 @@ pipeline {
                     notifyWebhook('Deploy to Production', 'FAILURE')
                     // Auto-rollback on production failure
                     withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                        bat "kubectl rollout undo deployment/devops-platform -n production --kubeconfig=%KUBECONFIG%"
+                        bat "kubectl rollout undo deployment/devops-platform -n production --kubeconfig=\"%KUBECONFIG%\""
                     }
                 }
             }

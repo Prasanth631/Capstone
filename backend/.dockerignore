@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+*.jar
+*.war
+*.class
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.suo
+
+# Git
+.git/
+.gitignore
+
+# Logs
+logs/
+*.log
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Test reports
+**/surefire-reports/
+**/failsafe-reports/
+**/jacoco.exec
+
+# OS files
+.DS_Store
+Thumbs.db
