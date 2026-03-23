@@ -14,15 +14,12 @@ metadata:
     app: devops-platform
     environment: production
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: devops-platform
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    type: Recreate
   template:
     metadata:
       labels:
@@ -60,8 +57,8 @@ spec:
                   key: db-password
           resources:
             requests:
-              cpu: "1000m"
-              memory: "1Gi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
               cpu: "2000m"
               memory: "2Gi"

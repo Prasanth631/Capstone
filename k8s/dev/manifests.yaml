@@ -19,10 +19,7 @@ spec:
     matchLabels:
       app: devops-platform
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    type: Recreate
   template:
     metadata:
       labels:
@@ -44,8 +41,8 @@ spec:
                   key: jwt-secret
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
               cpu: "500m"
               memory: "1Gi"
