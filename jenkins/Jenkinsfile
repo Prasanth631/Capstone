@@ -62,31 +62,7 @@ pipeline {
             }
         }
 
-        // ===== STAGE 4: Static Analysis (SonarQube) =====
-        stage('Static Analysis') {
-            when {
-                expression { return false } // Skips because local SonarQube server is not running
-            }
-            steps {
-                notifyWebhook('Static Analysis', 'IN_PROGRESS')
-                dir('backend') {
-                    withSonarQubeEnv('SonarQube') {
-                        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                            bat """mvn sonar:sonar \
-                                -Dsonar.projectKey=devops-platform \
-                                -Dsonar.projectName="DevOps Platform" \
-                                -Dsonar.token=%SONAR_TOKEN%"""
-                        }
-                    }
-                }
-                notifyWebhook('Static Analysis', 'SUCCESS')
-            }
-            post {
-                failure {
-                    notifyWebhook('Static Analysis', 'FAILURE')
-                }
-            }
-        }
+
 
         // ===== STAGE 5: API Tests (Newman/Postman) =====
         stage('API Tests') {
