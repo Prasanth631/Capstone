@@ -38,7 +38,6 @@ class AuthServiceTest {
     @Mock private Counter loginAttemptsCounter;
     @Mock private Counter loginFailuresCounter;
 
-    @InjectMocks
     private AuthService authService;
 
     private RegisterRequest registerRequest;
@@ -47,6 +46,8 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        authService = new AuthService(userRepository, passwordEncoder, tokenProvider, authenticationManager, loginAttemptsCounter, loginFailuresCounter);
+        
         registerRequest = new RegisterRequest("testuser", "test@email.com", "password123");
         loginRequest = new LoginRequest("testuser", "password123");
         testUser = User.builder()
