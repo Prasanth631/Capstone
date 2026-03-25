@@ -33,7 +33,7 @@ spec:
             - containerPort: 8082
           env:
             - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
+              value: "dev"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
