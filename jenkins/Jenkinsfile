@@ -144,7 +144,7 @@ pipeline {
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
                     bat "kubectl apply -f k8s/staging/ --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n staging --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl rollout status deployment/devops-platform -n staging --timeout=180s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n staging --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Staging', 'SUCCESS')
             }
