@@ -8,8 +8,14 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.ThreadMXBean;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -57,43 +63,88 @@ public class MetricsService {
     }
 
     public Map<String, Object> getDockerStatus() {
-        // Simulated Docker status — in production, this would call the Docker Engine API
         Map<String, Object> status = new HashMap<>();
-        status.put("containers", Map.of(
-            "running", 4,
-            "total", 5,
-            "details", new Map[]{
-                Map.of("name", "devops-backend", "image", "devops-platform:latest",
-                       "status", "running", "health", "healthy", "uptime", "2h 15m"),
-                Map.of("name", "devops-frontend", "image", "devops-frontend:latest",
-                       "status", "running", "health", "healthy", "uptime", "2h 15m"),
-                Map.of("name", "postgres", "image", "postgres:15-alpine",
-                       "status", "running", "health", "healthy", "uptime", "2h 16m"),
-                Map.of("name", "prometheus", "image", "prom/prometheus:latest",
-                       "status", "running", "health", "healthy", "uptime", "2h 14m"),
-                Map.of("name", "grafana", "image", "grafana/grafana:latest",
-                       "status", "stopped", "health", "N/A", "uptime", "N/A")
+        List<Map<String, String>> containerDetails = new ArrayList<>();
+        int running = 0;
+        int total = 0;
+
+        List<String> lines = executeCommand("docker", "ps", "-a", "--format", "{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}");
+        
+        for (String line : lines) {
+            String[] parts = line.split("\\|");
+            if (parts.length >= 4) {
+                total++;
+                boolean isRunning = "running".equalsIgnoreCase(parts[2]);
+                if (isRunning) running++;
+                
+                containerDetails.add(Map.of(
+                    "name", parts[0],
+                    "image", parts[1],
+                    "status", parts[2],
+                    "health", isRunning ? "healthy" : "N/A",
+                    "uptime", parts[3]
+                ));
             }
+        }
+
+        status.put("containers", Map.of(
+            "running", running,
+            "total", total,
+            "details", containerDetails
         ));
         return status;
     }
 
     public Map<String, Object> getKubernetesStatus() {
-        // Simulated K8s status — in production, this would call the Kubernetes API
         Map<String, Object> status = new HashMap<>();
+        List<Map<String, Object>> namespacesData = new ArrayList<>();
+        
+        // Define the namespaces we care about
+        String[] targetNamespaces = {"dev", "staging", "production"};
+        
+        for (String ns : targetNamespaces) {
+            List<String> lines = executeCommand("kubectl", "get", "pods", "-n", ns, "--no-headers");
+            int total = 0;
+            int running = 0;
+            String lastRollout = "N/A";
+            
+            for (String line : lines) {
+                if (line.trim().isEmpty()) continue;
+                total++;
+                if (line.contains("Running")) {
+                    running++;
+                }
+                // Just use the age of the first pod as a simplistic rollout time for the dashboard
+                if (lastRollout.equals("N/A")) {
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length >= 5) {
+                        lastRollout = parts[4] + " ago";
+                    }
+                }
+            }
+            
+            Map<String, Object> nsData = new HashMap<>();
+            nsData.put("namespace", ns);
+            nsData.put("pods", Map.of("running", running, "total", total));
+            nsData.put("replicaHealth", total > 0 && running == total ? "healthy" : (total > 0 ? "degraded" : "unknown"));
+            nsData.put("lastRollout", lastRollout);
+            
+            namespacesData.add(nsData);
+        }
 
-        Map<String, Object> dev = Map.of(
-            "namespace", "dev", "pods", Map.of("running", 2, "total", 2),
-            "replicaHealth", "healthy", "lastRollout", "10 minutes ago");
-        Map<String, Object> staging = Map.of(
-            "namespace", "staging", "pods", Map.of("running", 2, "total", 2),
-            "replicaHealth", "healthy", "lastRollout", "1 hour ago");
-        Map<String, Object> production = Map.of(
-            "namespace", "production", "pods", Map.of("running", 3, "total", 3),
-            "replicaHealth", "healthy", "lastRollout", "3 hours ago",
-            "hpa", Map.of("minReplicas", 2, "maxReplicas", 10, "currentReplicas", 3, "targetCpuUtilization", 60));
-
-        status.put("namespaces", new Map[]{dev, staging, production});
+        status.put("namespaces", namespacesData);
         return status;
+    }
+
+    private List<String> executeCommand(String... command) {
+        try {
+            Process process = new ProcessBuilder(command).start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                return reader.lines().toList();
+            }
+        } catch (Exception e) {
+            log.error("Failed to execute external command", e);
+            return Collections.emptyList();
+        }
     }
 }

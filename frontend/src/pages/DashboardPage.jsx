@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import api from '../api/axios'
-import { LogOut, Cpu, RefreshCw, Activity } from 'lucide-react'
+import { LogOut, Cpu, Activity } from 'lucide-react'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { db } from '../firebase'
 import PipelineStatusPanel from '../components/PipelineStatusPanel'
 import BuildHistoryTable from '../components/BuildHistoryTable'
 import TestResultsSummary from '../components/TestResultsSummary'
@@ -24,40 +25,32 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(new Date())
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [builds, pipeline, metrics, tests, docker, k8s, analytics] = await Promise.allSettled([
-        api.get('/dashboard/builds?limit=20'),
-        api.get('/dashboard/pipeline-status'),
-        api.get('/dashboard/metrics'),
-        api.get('/dashboard/test-results'),
-        api.get('/dashboard/docker-status'),
-        api.get('/dashboard/k8s-status'),
-        api.get('/dashboard/build-analytics'),
-      ])
-
-      setData({
-        builds: builds.status === 'fulfilled' ? builds.value.data.data || [] : [],
-        pipelineStatus: pipeline.status === 'fulfilled' ? pipeline.value.data.data || [] : [],
-        metrics: metrics.status === 'fulfilled' ? metrics.value.data.data || {} : {},
-        testResults: tests.status === 'fulfilled' ? tests.value.data.data || {} : {},
-        dockerStatus: docker.status === 'fulfilled' ? docker.value.data.data || {} : {},
-        k8sStatus: k8s.status === 'fulfilled' ? k8s.value.data.data || {} : {},
-        buildAnalytics: analytics.status === 'fulfilled' ? analytics.value.data.data || {} : {},
-      })
-      setLastRefresh(new Date())
-    } catch (err) {
-      console.error('Dashboard fetch error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    fetchAll()
-    const interval = setInterval(fetchAll, 30000)
-    return () => clearInterval(interval)
-  }, [fetchAll])
+    // Listen directly to the aggregated dashboard document in Firestore in real-time
+    const unsub = onSnapshot(doc(db, 'dashboard', 'overview'), (docSnap) => {
+      if (docSnap.exists()) {
+        const payload = docSnap.data()
+        setData({
+          builds: payload.recentBuilds || [],
+          pipelineStatus: payload.pipelines || [],
+          metrics: payload.metrics || {},
+          testResults: payload.testResults || {},
+          dockerStatus: payload.dockerStatus || {},
+          k8sStatus: payload.k8sStatus || {},
+          buildAnalytics: payload.buildAnalytics || {},
+        })
+        setLastRefresh(new Date(payload.lastUpdated || Date.now()))
+        setLoading(false)
+      } else {
+        setLoading(false)
+      }
+    }, (error) => {
+      console.error("Firebase real-time stream error:", error)
+      setLoading(false)
+    })
+
+    return () => unsub()
+  }, [])
 
   return (
     <div className="min-h-screen bg-surface-900">
@@ -75,14 +68,11 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs text-white/40">
-              <Activity className="w-3 h-3 text-emerald-400 animate-pulse" />
-              <span>Live</span>
-              <span>· Updated {lastRefresh.toLocaleTimeString()}</span>
+            <div className="flex items-center gap-2 text-xs text-emerald-400">
+              <Activity className="w-3 h-3 animate-pulse" />
+              <span>Live Stream Connected</span>
+              <span className="text-white/40 ml-2">· Updated {lastRefresh.toLocaleTimeString()}</span>
             </div>
-            <button onClick={fetchAll} className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white" title="Refresh">
-              <RefreshCw className="w-4 h-4" />
-            </button>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
                 {user?.username?.[0]?.toUpperCase() || 'U'}
