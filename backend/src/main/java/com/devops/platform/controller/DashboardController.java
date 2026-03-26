@@ -1,7 +1,6 @@
 package com.devops.platform.controller;
 
 import com.devops.platform.dto.ApiResponse;
-import com.devops.platform.dto.BuildEvent;
 import com.devops.platform.dto.PipelineStatus;
 import com.devops.platform.service.MetricsService;
 import com.devops.platform.service.PipelineService;

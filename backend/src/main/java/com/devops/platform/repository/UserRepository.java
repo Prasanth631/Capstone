@@ -76,6 +76,7 @@ public class UserRepository {
         return findByEmail(email).isPresent();
     }
 
+    @SuppressWarnings("null")
     public User save(User user) {
         try {
             String userId = user.getId();
