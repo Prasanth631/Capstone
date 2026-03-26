@@ -3,7 +3,7 @@ package com.devops.platform.entity;
 import lombok.*;
 import com.google.cloud.firestore.annotation.DocumentId;
 
-import java.util.Set;
+import java.util.List;
 
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
@@ -18,7 +18,7 @@ public class User {
     private String password;
 
     @Builder.Default
-    private Set<String> roles = Set.of("ROLE_USER");
+    private List<String> roles = List.of("ROLE_USER");
 
     @Builder.Default
     private long createdAt = System.currentTimeMillis();
