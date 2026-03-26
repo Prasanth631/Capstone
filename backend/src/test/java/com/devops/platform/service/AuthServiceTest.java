@@ -49,7 +49,7 @@ class AuthServiceTest {
         registerRequest = new RegisterRequest("testuser", "test@email.com", "password123");
         loginRequest = new LoginRequest("testuser", "password123");
         testUser = User.builder()
-                .id(1L)
+                .id("user-id-1")
                 .username("testuser")
                 .email("test@email.com")
                 .password("$2a$10$encodedPassword")

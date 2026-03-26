@@ -47,11 +47,12 @@ public class FirestoreService {
             docRef.set(data).get();
 
             // Write test results as sub-document if present
-            if (event.getTestResults() != null && !event.getTestResults().isEmpty()) {
+            Map<String, Object> testResults = event.getTestResults();
+            if (testResults != null && !testResults.isEmpty()) {
                 firestore.collection("builds").document(docId)
                         .collection("testResults")
                         .document("results")
-                        .set(event.getTestResults()).get();
+                        .set(new HashMap<>(testResults)).get();
             }
 
             log.info("Build event written to Firestore: {}", docId);
@@ -93,6 +94,16 @@ public class FirestoreService {
             log.info("System event written to Firestore: {} - {}", type, message);
         } catch (Exception e) {
             log.error("Failed to write system event to Firestore", e);
+        }
+    }
+
+    public Map<String, Object> getDashboardOverview() {
+        if (firestore == null) return null;
+        try {
+            return firestore.collection("dashboard").document("overview").get().get().getData();
+        } catch (Exception e) {
+            log.error("Failed to fetch dashboard overview", e);
+            return null;
         }
     }
 }

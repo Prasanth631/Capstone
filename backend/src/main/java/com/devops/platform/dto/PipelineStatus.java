@@ -21,6 +21,8 @@ public class PipelineStatus {
     private long startTime;
     private long endTime;
     private long totalDuration;
+    private String gitBranch;
+    private String triggerType;
 
     @Data
     @NoArgsConstructor

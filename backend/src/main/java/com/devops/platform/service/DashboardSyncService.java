@@ -43,15 +43,14 @@ public class DashboardSyncService {
             dashboardData.put("dockerStatus", metricsService.getDockerStatus());
             dashboardData.put("k8sStatus", metricsService.getKubernetesStatus());
 
-            // 4. Test Results Summary
-            dashboardData.put("testResults", Map.of(
-                "totalTests", 156,
-                "passed", 148,
-                "failed", 5,
-                "skipped", 3,
-                "passRate", 94.87,
-                "lastRunTimestamp", Instant.now().toEpochMilli()
-            ));
+            // 4. Test Results Summary (Authentic real-time via webhook)
+            Map<String, Object> testData = new HashMap<>();
+            testData.put("totalTests", 0);
+            testData.put("passed", 0);
+            testData.put("failed", 0);
+            testData.put("skipped", 0);
+            testData.put("passRate", 0.0);
+            dashboardData.put("testResults", testData);
 
             dashboardData.put("lastUpdated", Instant.now().toEpochMilli());
 

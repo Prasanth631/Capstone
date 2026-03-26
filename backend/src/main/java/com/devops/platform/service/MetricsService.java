@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
-import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.ThreadMXBean;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -15,7 +14,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +24,10 @@ public class MetricsService {
         Map<String, Object> metrics = new HashMap<>();
 
         // CPU metrics
-        OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
-        metrics.put("cpuUsage", osBean.getSystemLoadAverage());
+        com.sun.management.OperatingSystemMXBean osBean = 
+            (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        double load = osBean.getCpuLoad();
+        metrics.put("cpuUsage", load >= 0 ? load : 0.0);
         metrics.put("availableProcessors", osBean.getAvailableProcessors());
 
         // Memory metrics

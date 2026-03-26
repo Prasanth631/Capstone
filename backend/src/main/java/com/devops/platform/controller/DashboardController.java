@@ -21,7 +21,7 @@ public class DashboardController {
     private final MetricsService metricsService;
 
     @GetMapping("/builds")
-    public ResponseEntity<ApiResponse<List<BuildEvent>>> getRecentBuilds(
+    public ResponseEntity<ApiResponse<List<PipelineStatus>>> getRecentBuilds(
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(
                 ApiResponse.ok(pipelineService.getRecentBuilds(limit)));

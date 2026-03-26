@@ -4,15 +4,7 @@ import { History, Search, GitBranch, Clock } from 'lucide-react'
 export default function BuildHistoryTable({ builds }) {
   const [search, setSearch] = useState('')
 
-  const demoBuilds = builds?.length > 0 ? builds : [
-    { buildNumber: 42, jobName: 'devops-platform', status: 'SUCCESS', duration: 245000, gitBranch: 'main', triggerType: 'push', timestamp: Date.now() - 600000 },
-    { buildNumber: 41, jobName: 'devops-platform', status: 'SUCCESS', duration: 312000, gitBranch: 'main', triggerType: 'push', timestamp: Date.now() - 3600000 },
-    { buildNumber: 40, jobName: 'devops-platform', status: 'FAILURE', duration: 158000, gitBranch: 'feature/auth', triggerType: 'PR', timestamp: Date.now() - 7200000 },
-    { buildNumber: 39, jobName: 'devops-platform', status: 'SUCCESS', duration: 287000, gitBranch: 'main', triggerType: 'manual', timestamp: Date.now() - 14400000 },
-    { buildNumber: 38, jobName: 'devops-platform', status: 'SUCCESS', duration: 231000, gitBranch: 'develop', triggerType: 'push', timestamp: Date.now() - 28800000 },
-  ]
-
-  const filtered = demoBuilds.filter(b =>
+  const filtered = (builds || []).filter(b =>
     (b.jobName?.toLowerCase() || '').includes(search.toLowerCase()) ||
     (b.gitBranch?.toLowerCase() || '').includes(search.toLowerCase()) ||
     String(b.buildNumber).includes(search)
@@ -34,7 +26,7 @@ export default function BuildHistoryTable({ builds }) {
     SUCCESS: 'status-success',
     FAILURE: 'status-failure',
     IN_PROGRESS: 'status-running',
-    ABORTED: 'status-pending',
+    PENDING: 'status-pending',
   }
 
   return (
@@ -44,14 +36,14 @@ export default function BuildHistoryTable({ builds }) {
           <History className="w-5 h-5 text-primary-400" />
           <h2 className="text-lg font-semibold text-white">Build History</h2>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 group-focus-within:text-primary-400 transition-colors" />
           <input
             type="text"
             placeholder="Search builds..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary-400/50 w-52"
+            className="pl-9 pr-4 py-2 bg-[#0f172a] border border-white/10 rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 w-64 transition-all shadow-inner"
           />
         </div>
       </div>
@@ -71,8 +63,8 @@ export default function BuildHistoryTable({ builds }) {
           </thead>
           <tbody>
             {filtered.map((build, i) => (
-              <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                <td className="py-3 pr-4 font-mono text-white/70">#{build.buildNumber}</td>
+              <tr key={i} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group cursor-default">
+                <td className="py-4 pr-4 pl-2 font-mono text-white/80 font-medium">#{build.buildNumber}</td>
                 <td className="py-3 pr-4 text-white/80">{build.jobName}</td>
                 <td className="py-3 pr-4">
                   <span className="inline-flex items-center gap-1 text-white/60">
@@ -86,17 +78,17 @@ export default function BuildHistoryTable({ builds }) {
                   </span>
                 </td>
                 <td className="py-3 pr-4">
-                  <span className={statusClass[build.status] || 'status-pending'}>
-                    {build.status}
+                  <span className={statusClass[build.overallStatus] || 'status-pending'}>
+                    {build.overallStatus || 'PENDING'}
                   </span>
                 </td>
-                <td className="py-3 pr-4 font-mono text-white/60">
-                  <span className="inline-flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {formatDuration(build.duration)}
+                <td className="py-3 pr-4 font-mono text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 opacity-80">
+                    <Clock className="w-3.5 h-3.5" />
+                    {formatDuration(build.totalDuration)}
                   </span>
                 </td>
-                <td className="py-3 text-white/40 text-xs">{formatTime(build.timestamp)}</td>
+                <td className="py-3 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">{formatTime(build.startTime)}</td>
               </tr>
             ))}
           </tbody>

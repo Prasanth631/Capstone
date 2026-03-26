@@ -5,17 +5,9 @@ spring:
   application:
     name: devops-platform
 
-  # Default profile: dev (H2 in-memory)
+  # Default profile: dev (local dev overrides)
   profiles:
     active: dev
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
 
 # JWT Configuration
 jwt:

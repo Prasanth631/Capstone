@@ -8,6 +8,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -20,10 +24,48 @@ public class PipelineService {
     private final FirestoreService firestoreService;
     private final Counter buildTotalCounter;
     private final Timer buildDurationTimer;
+    private final ObjectMapper objectMapper;
 
     // In-memory pipeline state (for real-time dashboard queries)
     private final Map<String, PipelineStatus> activePipelines = new ConcurrentHashMap<>();
-    private final List<BuildEvent> recentBuilds = Collections.synchronizedList(new ArrayList<>());
+
+    @PostConstruct
+    public void restoreStateFromFirestore() {
+        log.info("Attempting to restore pipeline state from Firestore dashboard/overview...");
+        Map<String, Object> dashboard = firestoreService.getDashboardOverview();
+        if (dashboard != null) {
+            try {
+                if (dashboard.containsKey("pipelines")) {
+                    Map<String, PipelineStatus> restoredPipelines = objectMapper.convertValue(
+                            dashboard.get("pipelines"),
+                            new TypeReference<Map<String, PipelineStatus>>() {}
+                    );
+                    if (restoredPipelines != null) {
+                        activePipelines.putAll(restoredPipelines);
+                        log.info("Restored {} active pipelines", activePipelines.size());
+                    }
+                }
+                
+                if (dashboard.containsKey("recentBuilds")) {
+                    List<PipelineStatus> restoredBuilds = objectMapper.convertValue(
+                            dashboard.get("recentBuilds"),
+                            new TypeReference<List<PipelineStatus>>() {}
+                    );
+                    if (restoredBuilds != null) {
+                        for (PipelineStatus ps : restoredBuilds) {
+                            String key = ps.getJobName() + "-" + ps.getBuildNumber();
+                            activePipelines.putIfAbsent(key, ps);
+                        }
+                        log.info("Restored {} history builds", restoredBuilds.size());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to deserialize pipeline state from Firestore", e);
+            }
+        } else {
+            log.info("No prior dashboard state found in Firestore. Starting fresh.");
+        }
+    }
 
     private static final List<String> PIPELINE_STAGES = List.of(
             "Checkout", "Build", "Unit & Integration Tests", "Static Analysis",
@@ -47,12 +89,6 @@ public class PipelineService {
         // Persist to Firestore
         firestoreService.writeBuildEvent(event);
 
-        // Track in recent builds
-        recentBuilds.add(0, event);
-        if (recentBuilds.size() > 100) {
-            recentBuilds.subList(100, recentBuilds.size()).clear();
-        }
-
         // If it's a deployment stage, write deployment record
         if (event.getStage() != null && event.getStage().toLowerCase().contains("deploy")) {
             String namespace = extractNamespace(event.getStage());
@@ -69,6 +105,8 @@ public class PipelineService {
                     .buildNumber(event.getBuildNumber())
                     .jobName(event.getJobName())
                     .overallStatus("IN_PROGRESS")
+                    .gitBranch(event.getGitBranch())
+                    .triggerType(event.getTriggerType())
                     .stages(buildInitialStages())
                     .startTime(event.getTimestamp())
                     .build();
@@ -129,20 +167,23 @@ public class PipelineService {
         return new ArrayList<>(activePipelines.values());
     }
 
-    public List<BuildEvent> getRecentBuilds(int limit) {
-        return recentBuilds.stream().limit(limit).toList();
+    public List<PipelineStatus> getRecentBuilds(int limit) {
+        return activePipelines.values().stream()
+                .sorted(Comparator.comparingLong(PipelineStatus::getStartTime).reversed())
+                .limit(limit)
+                .toList();
     }
 
     public Map<String, Object> getBuildAnalytics() {
         Map<String, Object> analytics = new HashMap<>();
 
-        long totalBuilds = recentBuilds.size();
-        long successCount = recentBuilds.stream()
-                .filter(b -> "SUCCESS".equals(b.getStatus()))
+        long totalBuilds = activePipelines.size();
+        long successCount = activePipelines.values().stream()
+                .filter(b -> "SUCCESS".equals(b.getOverallStatus()))
                 .count();
         double successRate = totalBuilds > 0 ? (double) successCount / totalBuilds * 100 : 0;
-        OptionalDouble avgDuration = recentBuilds.stream()
-                .mapToLong(BuildEvent::getDuration)
+        OptionalDouble avgDuration = activePipelines.values().stream()
+                .mapToLong(PipelineStatus::getTotalDuration)
                 .filter(d -> d > 0)
                 .average();
 
@@ -151,10 +192,10 @@ public class PipelineService {
         analytics.put("failureCount", totalBuilds - successCount);
         analytics.put("successRate", Math.round(successRate * 100.0) / 100.0);
         analytics.put("avgDurationMs", avgDuration.orElse(0));
-        analytics.put("shortestBuildMs", recentBuilds.stream()
-                .mapToLong(BuildEvent::getDuration).filter(d -> d > 0).min().orElse(0));
-        analytics.put("longestBuildMs", recentBuilds.stream()
-                .mapToLong(BuildEvent::getDuration).max().orElse(0));
+        analytics.put("shortestBuildMs", activePipelines.values().stream()
+                .mapToLong(PipelineStatus::getTotalDuration).filter(d -> d > 0).min().orElse(0));
+        analytics.put("longestBuildMs", activePipelines.values().stream()
+                .mapToLong(PipelineStatus::getTotalDuration).max().orElse(0));
 
         return analytics;
     }
