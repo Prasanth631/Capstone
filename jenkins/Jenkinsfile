@@ -25,6 +25,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 notifyWebhook('Checkout', 'IN_PROGRESS')
+                deleteDir()
                 checkout scm
                 notifyWebhook('Checkout', 'SUCCESS')
             }
@@ -51,7 +52,7 @@ pipeline {
             steps {
                 notifyWebhook('Unit & Integration Tests', 'IN_PROGRESS')
                 dir('backend') {
-                    bat 'mvn test -B'
+                    bat 'mvn clean test -B'
                 }
                 notifyWebhook('Unit & Integration Tests', 'SUCCESS')
             }
