@@ -49,7 +49,7 @@ A production-grade deployment system that takes code commits to live deployment 
 
 | Layer        | Technology                                     |
 |-------------|------------------------------------------------|
-| Backend      | Spring Boot 3.4, Java 17, Spring Security, JPA |
+| Backend      | Spring Boot 3.4, Java 17, Spring Security |
 | Auth         | JWT (JJWT), BCrypt                             |
 | Frontend     | React 18, Vite 6, Tailwind CSS, Recharts       |
 | Real-time DB | Firebase Firestore (onSnapshot listeners)      |
@@ -127,7 +127,7 @@ Capstone/
 |--------|---------------------------------|--------|---------------------------------|
 | POST   | `/api/auth/register`            | Public | Register new user, returns JWT  |
 | POST   | `/api/auth/login`               | Public | Login, returns JWT              |
-| GET    | `/api/dashboard/builds`         | JWT    | Recent build history            |
+| GET    | `/api/dashboard/builds`         | JWT    | Paged build history (`limit`, `cursor`) |
 | GET    | `/api/dashboard/pipeline-status`| JWT    | Active pipeline status          |
 | GET    | `/api/dashboard/metrics`        | JWT    | System metrics (CPU/RAM/JVM)    |
 | GET    | `/api/dashboard/test-results`   | JWT    | Test results summary            |
@@ -135,6 +135,7 @@ Capstone/
 | GET    | `/api/dashboard/k8s-status`     | JWT    | Kubernetes cluster state        |
 | GET    | `/api/dashboard/build-analytics`| JWT    | Build analytics summary         |
 | POST   | `/api/webhook/jenkins`          | Public | Jenkins stage webhook receiver  |
+| POST   | `/api/admin/backfill/jenkins`   | JWT    | Trigger Jenkins historical backfill |
 | GET    | `/actuator/health`              | Public | Health check                    |
 | GET    | `/actuator/prometheus`          | Public | Prometheus metrics              |
 
@@ -148,7 +149,10 @@ Copy `.env.example` to `.env` and fill in your values:
 |---------------------|-----------------------------------|
 | `JWT_SECRET`         | 256-bit secret for JWT signing    |
 | `FIREBASE_CONFIG_PATH` | Path to Firebase service account JSON |
-| `DB_HOST/PORT/NAME`  | PostgreSQL connection (staging/prod) |
+| `JENKINS_BASE_URL`   | Jenkins base URL used for backfill |
+| `JENKINS_USERNAME`   | Jenkins API username               |
+| `JENKINS_API_TOKEN`  | Jenkins API token/password         |
+| `JENKINS_BACKFILL_DEFAULT_PER_JOB_LIMIT` | Max builds imported per job (default `500`) |
 | `DOCKER_USERNAME`    | Docker Hub username               |
 | `DOCKER_PASSWORD`    | Docker Hub password/token         |
 

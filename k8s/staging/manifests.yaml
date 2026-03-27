@@ -33,28 +33,12 @@ spec:
             - containerPort: 8082
           env:
             - name: SPRING_PROFILES_ACTIVE
-              value: "dev"
+              value: "staging"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret
-            - name: DB_HOST
-              value: "postgres-service"
-            - name: DB_PORT
-              value: "5432"
-            - name: DB_NAME
-              value: "devops_staging"
-            - name: DB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: db-username
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: db-password
           resources:
             requests:
               cpu: "100m"
@@ -110,8 +94,6 @@ metadata:
 type: Opaque
 stringData:
   jwt-secret: "stagingSecretKeyThatIsAtLeast256BitsLongForHmacSHA256Algorithm2024!"
-  db-username: "devops"
-  db-password: "devops_staging_password"
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

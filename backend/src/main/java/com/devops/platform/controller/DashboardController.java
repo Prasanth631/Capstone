@@ -1,6 +1,7 @@
 package com.devops.platform.controller;
 
 import com.devops.platform.dto.ApiResponse;
+import com.devops.platform.dto.PagedBuildResponse;
 import com.devops.platform.dto.PipelineStatus;
 import com.devops.platform.service.MetricsService;
 import com.devops.platform.service.PipelineService;
@@ -20,10 +21,11 @@ public class DashboardController {
     private final MetricsService metricsService;
 
     @GetMapping("/builds")
-    public ResponseEntity<ApiResponse<List<PipelineStatus>>> getRecentBuilds(
-            @RequestParam(defaultValue = "20") int limit) {
+    public ResponseEntity<ApiResponse<PagedBuildResponse>> getRecentBuilds(
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) String cursor) {
         return ResponseEntity.ok(
-                ApiResponse.ok(pipelineService.getRecentBuilds(limit)));
+                ApiResponse.ok(pipelineService.getPagedBuilds(limit, cursor)));
     }
 
     @GetMapping("/pipeline-status")

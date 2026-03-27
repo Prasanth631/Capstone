@@ -50,7 +50,7 @@ class DashboardControllerIntegrationTest {
                         .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.builds").isArray());
     }
 
     @Test

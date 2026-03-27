@@ -44,7 +44,7 @@ public class FirebaseConfig {
                 log.info("Firebase has been initialized successfully");
             }
         } catch (IOException e) {
-            log.warn("Firebase initialization skipped — config file not found at: {}. " +
+            log.warn("Firebase initialization skipped - config file not found at: {}. " +
                      "Firestore features will be disabled.", firebaseConfigPath);
         }
     }

@@ -1,9 +1,4 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:devops_staging}
-    username: ${DB_USERNAME:devops}
-    password: ${DB_PASSWORD:devops_password}
-  jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-    hibernate:
-      ddl-auto: validate
+  config:
+    activate:
+      on-profile: staging

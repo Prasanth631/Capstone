@@ -30,10 +30,12 @@ public class DashboardSyncService {
 
         try {
             Map<String, Object> dashboardData = new HashMap<>();
+            var pagedBuilds = pipelineService.getPagedBuilds(20, null);
             
             // 1. Pipeline Status (Active & Recent)
             dashboardData.put("pipelines", pipelineService.getAllActivePipelines());
-            dashboardData.put("recentBuilds", pipelineService.getRecentBuilds(20));
+            dashboardData.put("recentBuilds", pagedBuilds.getBuilds());
+            dashboardData.put("recentBuildsNextCursor", pagedBuilds.getNextCursor());
             dashboardData.put("buildAnalytics", pipelineService.getBuildAnalytics());
 
             // 2. System Metrics (JVM & OS)

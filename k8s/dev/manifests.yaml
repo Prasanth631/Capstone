@@ -95,4 +95,3 @@ metadata:
 type: Opaque
 stringData:
   jwt-secret: "devSecretKeyThatIsAtLeast256BitsLongForHmacSHA256Algorithm2024!"
-  db-password: "devops_password"

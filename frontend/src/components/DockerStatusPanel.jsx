@@ -4,7 +4,6 @@ export default function DockerStatusPanel({ status }) {
   const containers = status?.containers?.details || [
     { name: 'devops-backend', image: 'devops-platform:latest', status: 'running', health: 'healthy', uptime: '2h 15m' },
     { name: 'devops-frontend', image: 'devops-frontend:latest', status: 'running', health: 'healthy', uptime: '2h 15m' },
-    { name: 'postgres', image: 'postgres:15-alpine', status: 'running', health: 'healthy', uptime: '2h 16m' },
     { name: 'prometheus', image: 'prom/prometheus:latest', status: 'running', health: 'healthy', uptime: '2h 14m' },
     { name: 'grafana', image: 'grafana/grafana:latest', status: 'stopped', health: 'N/A', uptime: 'N/A' },
   ]

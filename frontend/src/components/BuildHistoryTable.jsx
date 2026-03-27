@@ -1,24 +1,24 @@
 import { useState } from 'react'
 import { History, Search, GitBranch, Clock } from 'lucide-react'
 
-export default function BuildHistoryTable({ builds }) {
+export default function BuildHistoryTable({ builds, loading, hasMore, loadingMore, onLoadMore }) {
   const [search, setSearch] = useState('')
 
-  const filtered = (builds || []).filter(b =>
-    (b.jobName?.toLowerCase() || '').includes(search.toLowerCase()) ||
-    (b.gitBranch?.toLowerCase() || '').includes(search.toLowerCase()) ||
-    String(b.buildNumber).includes(search)
+  const filtered = (builds || []).filter((build) =>
+    (build.jobName?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    (build.gitBranch?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    String(build.buildNumber).includes(search)
   )
 
   const formatDuration = (ms) => {
-    if (!ms) return '—'
-    const s = Math.floor(ms / 1000)
-    const m = Math.floor(s / 60)
-    return m > 0 ? `${m}m ${s % 60}s` : `${s}s`
+    if (!ms) return '-'
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    return minutes > 0 ? `${minutes}m ${seconds % 60}s` : `${seconds}s`
   }
 
   const formatTime = (ts) => {
-    if (!ts) return '—'
+    if (!ts) return '-'
     return new Date(ts).toLocaleString()
   }
 
@@ -62,8 +62,11 @@ export default function BuildHistoryTable({ builds }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((build, i) => (
-              <tr key={i} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group cursor-default">
+            {filtered.map((build) => (
+              <tr
+                key={`${build.jobName}-${build.buildNumber}-${build.startTime}`}
+                className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group cursor-default"
+              >
                 <td className="py-4 pr-4 pl-2 font-mono text-white/80 font-medium">#{build.buildNumber}</td>
                 <td className="py-3 pr-4 text-white/80">{build.jobName}</td>
                 <td className="py-3 pr-4">
@@ -93,8 +96,26 @@ export default function BuildHistoryTable({ builds }) {
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && (
+
+        {loading && (
+          <p className="text-center text-white/40 py-8">Loading build history...</p>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <p className="text-center text-white/30 py-8">No builds found</p>
+        )}
+      </div>
+
+      <div className="mt-4 flex justify-center">
+        {hasMore && (
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-lg bg-primary-500/15 border border-primary-400/30 text-primary-200 hover:bg-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loadingMore ? 'Loading...' : 'Load More'}
+          </button>
         )}
       </div>
     </div>

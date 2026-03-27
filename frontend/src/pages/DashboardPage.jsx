@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { LogOut, Cpu, Activity } from 'lucide-react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
+import api from '../api/axios'
 import PipelineStatusPanel from '../components/PipelineStatusPanel'
 import BuildHistoryTable from '../components/BuildHistoryTable'
 import TestResultsSummary from '../components/TestResultsSummary'
@@ -13,8 +14,8 @@ import BuildAnalytics from '../components/BuildAnalytics'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
+  const pageSize = 40
   const [data, setData] = useState({
-    builds: [],
     pipelineStatus: [],
     metrics: {},
     testResults: {},
@@ -22,8 +23,60 @@ export default function DashboardPage() {
     k8sStatus: {},
     buildAnalytics: {},
   })
+  const [buildHistory, setBuildHistory] = useState([])
+  const [buildsCursor, setBuildsCursor] = useState(null)
+  const [hasMoreBuilds, setHasMoreBuilds] = useState(true)
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(new Date())
+
+  const fetchBuildPage = async (cursor = null, append = false) => {
+    if (append) {
+      setHistoryLoadingMore(true)
+    } else {
+      setHistoryLoading(true)
+    }
+
+    try {
+      const response = await api.get('/dashboard/builds', {
+        params: {
+          limit: pageSize,
+          ...(cursor ? { cursor } : {})
+        }
+      })
+      const payload = response.data?.data || {}
+      const builds = Array.isArray(payload.builds) ? payload.builds : []
+      const nextCursor = payload.nextCursor || null
+
+      setBuildHistory((prev) => (append ? [...prev, ...builds] : builds))
+      setBuildsCursor(nextCursor)
+      setHasMoreBuilds(Boolean(nextCursor))
+    } catch (error) {
+      console.error('Failed to fetch build history page:', error)
+      if (!append) {
+        setBuildHistory([])
+        setHasMoreBuilds(false)
+      }
+    } finally {
+      if (append) {
+        setHistoryLoadingMore(false)
+      } else {
+        setHistoryLoading(false)
+      }
+    }
+  }
+
+  const loadMoreBuilds = () => {
+    if (!hasMoreBuilds || historyLoadingMore) {
+      return
+    }
+    fetchBuildPage(buildsCursor, true)
+  }
+
+  useEffect(() => {
+    fetchBuildPage(null, false)
+  }, [])
 
   useEffect(() => {
     // Listen directly to the aggregated dashboard document in Firestore in real-time
@@ -31,7 +84,6 @@ export default function DashboardPage() {
       if (docSnap.exists()) {
         const payload = docSnap.data()
         setData({
-          builds: payload.recentBuilds || [],
           pipelineStatus: payload.pipelines || [],
           metrics: payload.metrics || {},
           testResults: payload.testResults || {},
@@ -71,7 +123,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 text-xs text-emerald-400">
               <Activity className="w-3 h-3 animate-pulse" />
               <span>Live Stream Connected</span>
-              <span className="text-white/40 ml-2">· Updated {lastRefresh.toLocaleTimeString()}</span>
+              <span className="text-white/40 ml-2">| Updated {lastRefresh.toLocaleTimeString()}</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
@@ -113,7 +165,13 @@ export default function DashboardPage() {
             </div>
 
             {/* Row 5: Build History Table */}
-            <BuildHistoryTable builds={data.builds} />
+            <BuildHistoryTable
+              builds={buildHistory}
+              loading={historyLoading}
+              hasMore={hasMoreBuilds}
+              loadingMore={historyLoadingMore}
+              onLoadMore={loadMoreBuilds}
+            />
           </>
         )}
       </main>
