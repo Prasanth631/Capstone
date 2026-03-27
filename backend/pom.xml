@@ -22,6 +22,7 @@
         <jjwt.version>0.12.6</jjwt.version>
         <firebase-admin.version>9.4.3</firebase-admin.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <lombok.version>1.18.38</lombok.version>
     </properties>
 
     <dependencies>
@@ -81,6 +82,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
             <optional>true</optional>
         </dependency>
 
