@@ -56,18 +56,26 @@ export default function Navbar({ lastRefresh }) {
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-white/5 border border-surface-200 dark:border-white/10">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
-                {user?.username?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <span className="text-sm text-surface-700 dark:text-white/70 hidden sm:inline">{user?.username}</span>
-            </div>
+            {user ? (
+              <>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-white/5 border border-surface-200 dark:border-white/10">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
+                    {user?.username?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-sm text-surface-700 dark:text-white/70 hidden sm:inline">{user?.username}</span>
+                </div>
 
-            <button onClick={logout}
-              className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors text-surface-400 dark:text-white/60 hover:text-red-500 dark:hover:text-red-400"
-              title="Logout">
-              <LogOut className="w-4 h-4" />
-            </button>
+                <button onClick={logout}
+                  className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors text-surface-400 dark:text-white/60 hover:text-red-500 dark:hover:text-red-400"
+                  title="Logout">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+                <Link to="/login" className="px-4 py-1.5 rounded-lg text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors">
+                  Sign In
+                </Link>
+            )}
           </div>
         </div>
 
@@ -81,8 +89,8 @@ export default function Navbar({ lastRefresh }) {
             <LayoutDashboard className="w-4 h-4" />
             CI/CD Dashboard
           </Link>
-          <Link to="/expenses" className={`flex items-center gap-2 pb-3 px-1 border-b-2 text-sm font-medium transition-colors ${
-            location.pathname === '/expenses' 
+          <Link to="/expense-tracker" className={`flex items-center gap-2 pb-3 px-1 border-b-2 text-sm font-medium transition-colors ${
+            location.pathname === '/expense-tracker' 
               ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
               : 'border-transparent text-surface-500 dark:text-muted hover:text-surface-800 dark:hover:text-white/80'
           }`}>

@@ -5,10 +5,8 @@ import api from '../api/axios'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  // Hardcoded default user to bypass login requirements
-  const defaultUser = { username: 'Admin', email: 'admin@devops.local' }
-  const [token, setToken] = useState('bypassed-token')
-  const [user, setUser] = useState(defaultUser)
+  const [token, setToken] = useState(localStorage.getItem('token'))
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 

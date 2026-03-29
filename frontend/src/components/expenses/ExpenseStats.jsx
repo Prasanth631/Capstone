@@ -1,8 +1,8 @@
-import { DollarSign, Receipt, CreditCard } from 'lucide-react'
+import { DollarSign, Receipt, CreditCard, TrendingUp, AlertCircle, Target } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts'
 import { categories } from './CategoryBadge'
 
-export default function ExpenseStats({ expenses }) {
+export default function ExpenseStats({ expenses, selectedMonth }) {
   if (!expenses || expenses.length === 0) {
     return (
       <div className="glass-card p-6 min-h-[400px] flex items-center justify-center text-center">
@@ -19,6 +19,28 @@ export default function ExpenseStats({ expenses }) {
   const totalSpent = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0)
   const averageSpent = expenses.length > 0 ? totalSpent / expenses.length : 0
 
+  // Budget Engine Setup (Fixed 5000 for SaaS demo purposes)
+  const monthlyBudget = 5000
+  const budgetUsedPercent = Math.min((totalSpent / monthlyBudget) * 100, 100)
+  const isOverBudget = totalSpent > monthlyBudget
+  
+  // Forecast Calculator
+  let forecastedSpend = null
+  let dailyRunRate = null
+  const currentMonthYear = new Date().toISOString().slice(0, 7)
+  
+  if (selectedMonth === currentMonthYear || selectedMonth === 'all') {
+    const today = new Date()
+    const currentDay = today.getDate()
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    
+    // Only calculate forecast if we have > 1 day elapsed to avoid infinity
+    if (currentDay > 1) {
+      dailyRunRate = totalSpent / currentDay
+      forecastedSpend = dailyRunRate * daysInMonth
+    }
+  }
+
   // Aggregate by category for donut chart
   const categoryTotals = expenses.reduce((acc, exp) => {
     const cat = exp.category || 'other'
@@ -26,16 +48,9 @@ export default function ExpenseStats({ expenses }) {
     return acc
   }, {})
 
-  // Map into Recharts format
-  // Example color mapping
   const colorMap = {
-    food: '#fb923c', // orange-400
-    transport: '#60a5fa', // blue-400
-    utilities: '#818cf8', // indigo-400
-    software: '#c084fc', // purple-400
-    marketing: '#f472b6', // pink-400
-    hardware: '#94a3b8', // slate-400
-    other: '#a1a1aa' // zinc-400
+    food: '#fb923c', transport: '#60a5fa', utilities: '#818cf8',
+    software: '#c084fc', marketing: '#f472b6', hardware: '#94a3b8', other: '#a1a1aa'
   }
 
   const chartData = Object.keys(categoryTotals)
@@ -46,16 +61,18 @@ export default function ExpenseStats({ expenses }) {
     }))
     .sort((a, b) => b.value - a.value)
 
-  const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val)
+  const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)
 
   return (
     <div className="space-y-6">
-      {/* Total Spent Card */}
+      {/* Total Spent Card with Budget Engine */}
       <div className="glass-card p-6 bg-gradient-to-br from-primary-50 dark:from-white/5 to-surface-50 dark:to-surface-950 border-primary-100 dark:border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-3xl -mr-16 -mt-16" />
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="relative z-10 flex items-start justify-between mb-6">
           <div>
-            <p className="text-sm font-semibold text-primary-700 dark:text-primary-300 mb-1">Total Spent</p>
+            <p className="text-sm font-semibold text-primary-700 dark:text-primary-300 mb-1">
+              {selectedMonth === 'all' ? 'Total Spent (All Time)' : 'Monthly Spend'}
+            </p>
             <h2 className="text-3xl font-bold font-mono text-heading tracking-tight">
               {formatCurrency(totalSpent)}
             </h2>
@@ -64,27 +81,62 @@ export default function ExpenseStats({ expenses }) {
             <DollarSign className="w-6 h-6 text-primary-600 dark:text-primary-400" />
           </div>
         </div>
+        
+        {/* Progress Bar for Budget */}
+        {selectedMonth !== 'all' && (
+          <div className="relative z-10 space-y-2">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-surface-600 dark:text-white/60">Budget</span>
+              <span className={isOverBudget ? "text-red-500" : "text-surface-600 dark:text-white/60"}>
+                {formatCurrency(totalSpent)} / {formatCurrency(monthlyBudget)}
+              </span>
+            </div>
+            <div className="h-2.5 w-full bg-black/5 dark:bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-1000 ease-out ${isOverBudget ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-primary-500 shadow-[0_0_10px_rgba(139,92,246,0.5)]'}`}
+                style={{ width: `${budgetUsedPercent}%` }}
+              />
+            </div>
+            {isOverBudget ? (
+              <p className="text-[11px] font-medium text-red-500 flex items-center gap-1 mt-1">
+                <AlertCircle className="w-3 h-3" /> You have exceeded your budget.
+              </p>
+            ) : (
+              <p className="text-[11px] font-medium text-surface-500 dark:text-white/50 flex items-center gap-1 mt-1">
+                <Target className="w-3 h-3" /> {formatCurrency(monthlyBudget - totalSpent)} remaining
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Forecast Data row */}
       <div className="grid grid-cols-2 gap-4">
         <div className="glass-card p-4">
-          <p className="text-xs font-semibold text-surface-500 dark:text-white/50 uppercase tracking-wider mb-2">Transactions</p>
+          <p className="text-[10px] font-bold text-surface-500 dark:text-white/50 uppercase tracking-widest mb-2">Transactions</p>
           <div className="flex items-end justify-between">
             <h3 className="text-xl font-bold font-mono text-heading">{expenses.length}</h3>
             <Receipt className="w-5 h-5 text-emerald-500 dark:text-emerald-400 mb-0.5" />
           </div>
         </div>
         <div className="glass-card p-4">
-          <p className="text-xs font-semibold text-surface-500 dark:text-white/50 uppercase tracking-wider mb-2">Avg / Item</p>
+          <p className="text-[10px] font-bold text-surface-500 dark:text-white/50 uppercase tracking-widest mb-2">
+            {forecastedSpend ? 'Est. Forecast' : 'Avg / Item'}
+          </p>
           <div className="flex items-end justify-between">
             <h3 className="text-xl font-bold font-mono text-heading leading-none -mb-[1px]">
-              {formatCurrency(averageSpent)}
+              {formatCurrency(forecastedSpend || averageSpent)}
             </h3>
-            <CreditCard className="w-5 h-5 text-purple-500 dark:text-purple-400 mb-0.5" />
+            {forecastedSpend ? (
+              <TrendingUp className="w-5 h-5 text-orange-500 dark:text-orange-400 mb-0.5" />
+            ) : (
+              <CreditCard className="w-5 h-5 text-purple-500 dark:text-purple-400 mb-0.5" />
+            )}
           </div>
         </div>
       </div>
 
+      {/* Analytics Chart */}
       <div className="glass-card p-6">
         <h3 className="text-sm font-semibold text-heading mb-6">Spending Analysis</h3>
         <div className="h-64 relative -mt-4">
