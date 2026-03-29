@@ -33,9 +33,10 @@ public class SecurityConfig {
                     "/api/webhook/**",
                     "/actuator/**",
                     "/h2-console/**",
-                    "/error"
+                    "/error",
+                    "/api/**" // allow all api routes for dashboard
                 ).permitAll()
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -3,23 +3,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Dashboard collection (read-only for all authenticated users)
+    // Dashboard collection (read-only from frontend)
     match /dashboard/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if false; // backend only via Admin SDK
+      allow read: if true;
+      allow write: if false; 
     }
     
-    // Builds collection (read-only for all authenticated users)
+    // Builds collection (read-only from frontend)
     match /builds/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if false; // backend only via Admin SDK
+      allow read: if true;
+      allow write: if false; 
     }
     
-    // Expenses collection (users can CRUD their own expenses)
+    // Expenses collection
     match /expenses/{expenseId} {
-      // request.auth.token.email is available because the custom JWT includes it in auth context, or they login via Firebase Auth.
-      allow read, write: if request.auth != null && request.resource.data.userEmail == request.auth.token.email;
-      allow update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
+      allow read, write: if true;
     }
   }
 }
