@@ -1,0 +1,34 @@
+# Test profile — used by integration tests via @ActiveProfiles("test")
+# Disables external dependencies (Firebase, Jenkins) so tests run standalone
+
+server:
+  port: 0  # random port for parallel test safety
+
+spring:
+  application:
+    name: devops-platform-test
+
+jwt:
+  secret: testSecretKeyThatIsAtLeast256BitsLongForHmacSHA256AlgorithmInTests2024!
+  expiration: 3600000  # 1 hour
+
+firebase:
+  config-path: does-not-exist-for-tests.json
+
+jenkins:
+  base-url: ""
+  username: ""
+  api-token: ""
+  backfill:
+    startup-enabled: false
+    default-per-job-limit: 10
+    skip-if-recent-minutes: 0
+
+github:
+  repo-url: https://github.com/Prasanth631/Capstone
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

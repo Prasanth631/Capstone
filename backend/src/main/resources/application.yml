@@ -50,3 +50,7 @@ jenkins:
     startup-enabled: ${JENKINS_BACKFILL_STARTUP_ENABLED:true}
     default-per-job-limit: ${JENKINS_BACKFILL_DEFAULT_PER_JOB_LIMIT:500}
     skip-if-recent-minutes: ${JENKINS_BACKFILL_SKIP_IF_RECENT_MINUTES:360}
+
+# GitHub
+github:
+  repo-url: ${GITHUB_REPO_URL:https://github.com/Prasanth631/Capstone}

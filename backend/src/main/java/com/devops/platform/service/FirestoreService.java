@@ -99,8 +99,17 @@ public class FirestoreService {
             if (gitCommit != null && !gitCommit.isBlank()) {
                 data.put("gitCommit", gitCommit);
             }
+            if (summary.getGitCommit() != null && !summary.getGitCommit().isBlank()) {
+                data.put("gitCommit", summary.getGitCommit());
+            }
             if (summary.getTriggerType() != null && !summary.getTriggerType().isBlank()) {
                 data.put("triggerType", summary.getTriggerType());
+            }
+            if (summary.getJenkinsUrl() != null && !summary.getJenkinsUrl().isBlank()) {
+                data.put("jenkinsUrl", summary.getJenkinsUrl());
+            }
+            if (summary.getGithubUrl() != null && !summary.getGithubUrl().isBlank()) {
+                data.put("githubUrl", summary.getGithubUrl());
             }
             data.put("source", source);
             data.put("lastUpdated", Instant.now().toEpochMilli());
@@ -111,7 +120,8 @@ public class FirestoreService {
         }
     }
 
-    public void upsertBackfillBuild(String jobName, int buildNumber, String status, long startTime, long durationMs) {
+    public void upsertBackfillBuild(String jobName, int buildNumber, String status, long startTime, long durationMs,
+                                     @Nullable String jenkinsUrl, @Nullable String githubUrl) {
         if (firestore == null) return;
         try {
             long normalizedStart = normalizedTimestamp(startTime);
@@ -126,6 +136,8 @@ public class FirestoreService {
                     .totalDuration(Math.max(durationMs, 0))
                     .gitBranch("unknown")
                     .triggerType("jenkins-backfill")
+                    .jenkinsUrl(jenkinsUrl)
+                    .githubUrl(githubUrl)
                     .build();
             upsertBuildSummary(summary, null, "jenkins-backfill");
         } catch (Exception e) {
@@ -362,7 +374,10 @@ public class FirestoreService {
                     .endTime(doc.getLong("endTime") != null ? doc.getLong("endTime") : 0L)
                     .totalDuration(doc.getLong("totalDuration") != null ? doc.getLong("totalDuration") : 0L)
                     .gitBranch(doc.getString("gitBranch"))
+                    .gitCommit(doc.getString("gitCommit"))
                     .triggerType(doc.getString("triggerType"))
+                    .jenkinsUrl(doc.getString("jenkinsUrl"))
+                    .githubUrl(doc.getString("githubUrl"))
                     .build();
         } catch (Exception e) {
             log.warn("Skipping malformed build summary document: {}", doc.getId(), e);

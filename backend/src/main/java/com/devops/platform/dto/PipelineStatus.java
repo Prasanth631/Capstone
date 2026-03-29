@@ -22,7 +22,10 @@ public class PipelineStatus {
     private long endTime;
     private long totalDuration;
     private String gitBranch;
+    private String gitCommit;
     private String triggerType;
+    private String jenkinsUrl;
+    private String githubUrl;
 
     @Data
     @NoArgsConstructor

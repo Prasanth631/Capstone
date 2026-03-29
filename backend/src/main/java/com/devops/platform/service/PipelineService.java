@@ -1,5 +1,6 @@
 package com.devops.platform.service;
 
+import com.devops.platform.config.JenkinsProperties;
 import com.devops.platform.dto.BuildEvent;
 import com.devops.platform.dto.PagedBuildResponse;
 import com.devops.platform.dto.PipelineStatus;
@@ -8,6 +9,7 @@ import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -25,8 +27,12 @@ import java.util.concurrent.TimeUnit;
 public class PipelineService {
 
     private final FirestoreService firestoreService;
+    private final JenkinsProperties jenkinsProperties;
     private final Counter buildTotalCounter;
     private final Timer buildDurationTimer;
+
+    @Value("${github.repo-url:https://github.com/Prasanth631/Capstone}")
+    private String githubRepoUrl;
 
     // Transient in-memory state for active pipelines while webhook events are flowing
     private final Map<String, PipelineStatus> activePipelines = new ConcurrentHashMap<>();
@@ -62,6 +68,18 @@ public class PipelineService {
 
         PipelineStatus status = updatePipelineState(event);
 
+        // Construct URLs if not already provided by the webhook
+        if (status.getJenkinsUrl() == null || status.getJenkinsUrl().isBlank()) {
+            String baseUrl = jenkinsProperties.getBaseUrl();
+            if (baseUrl != null && !baseUrl.isBlank()) {
+                String jobPath = event.getJobName() != null ? event.getJobName().replace("/", "/job/") : "unknown";
+                status.setJenkinsUrl(baseUrl.replaceAll("/+$", "") + "/job/" + jobPath + "/" + event.getBuildNumber() + "/");
+            }
+        }
+        if (status.getGithubUrl() == null || status.getGithubUrl().isBlank()) {
+            status.setGithubUrl(githubRepoUrl);
+        }
+
         // Persist canonical summary + raw event stream in Firestore
         firestoreService.upsertBuildSummary(status, event.getGitCommit(), "webhook");
         firestoreService.appendBuildEvent(event);
@@ -87,7 +105,9 @@ public class PipelineService {
                     .jobName(event.getJobName())
                     .overallStatus("IN_PROGRESS")
                     .gitBranch(event.getGitBranch())
+                    .gitCommit(event.getGitCommit())
                     .triggerType(event.getTriggerType())
+                    .jenkinsUrl(event.getJenkinsUrl())
                     .stages(buildInitialStages())
                     .startTime(timestamp)
                     .build();

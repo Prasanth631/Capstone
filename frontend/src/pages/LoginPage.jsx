@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Lock, User, Mail, ArrowRight, Cpu } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { Lock, User, Mail, ArrowRight, Cpu, Sun, Moon } from 'lucide-react'
 
 export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false)
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { login, register, loading, error, setError } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -23,11 +25,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-900 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950 relative overflow-hidden transition-colors duration-300">
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 z-20 p-2 rounded-lg bg-surface-100 dark:bg-white/5 hover:bg-surface-200 dark:hover:bg-white/10 text-surface-500 dark:text-white/60 transition-colors"
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      </button>
+
       {/* Animated background */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl animate-pulse-slow" />
-        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary-500/10 dark:bg-primary-600/20 rounded-full blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-500/10 dark:bg-purple-600/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1.5s' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-500/5 rounded-full blur-3xl" />
       </div>
 
@@ -37,28 +48,28 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-md px-6 animate-slide-up">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 mb-4 glow">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 mb-4 shadow-lg shadow-primary-500/25">
             <Cpu className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold gradient-text">DevOps Intelligence</h1>
-          <p className="text-surface-200/60 mt-2 text-sm">Real-time CI/CD monitoring & analytics</p>
+          <p className="text-surface-400 dark:text-surface-200/60 mt-2 text-sm">Real-time CI/CD monitoring & analytics</p>
         </div>
 
         {/* Login Card */}
-        <div className="glass-card p-8 glow">
-          <h2 className="text-xl font-semibold text-white mb-6">
+        <div className="glass-card p-8">
+          <h2 className="text-xl font-semibold text-heading mb-6">
             {isRegister ? 'Create Account' : 'Welcome Back'}
           </h2>
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm animate-fade-in">
+            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 text-sm animate-fade-in">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4" id="login-form">
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-200/40" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400 dark:text-surface-200/40" />
               <input
                 id="username"
                 type="text"
@@ -66,13 +77,13 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setError(null) }}
                 required
-                className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-primary-400/50 focus:bg-white/10 transition-all duration-300"
+                className="input-field pl-11"
               />
             </div>
 
             {isRegister && (
               <div className="relative animate-fade-in">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-200/40" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400 dark:text-surface-200/40" />
                 <input
                   id="email"
                   type="email"
@@ -80,13 +91,13 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(null) }}
                   required
-                  className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-primary-400/50 focus:bg-white/10 transition-all duration-300"
+                  className="input-field pl-11"
                 />
               </div>
             )}
 
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-200/40" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400 dark:text-surface-200/40" />
               <input
                 id="password"
                 type="password"
@@ -94,7 +105,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setError(null) }}
                 required
-                className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-primary-400/50 focus:bg-white/10 transition-all duration-300"
+                className="input-field pl-11"
               />
             </div>
 
@@ -102,7 +113,7 @@ export default function LoginPage() {
               id="submit-btn"
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary-500 to-purple-600 text-white font-semibold rounded-xl hover:from-primary-400 hover:to-purple-500 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 group"
+              className="w-full py-3 bg-gradient-to-r from-primary-500 to-purple-600 text-white font-semibold rounded-xl hover:from-primary-400 hover:to-purple-500 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 group shadow-lg shadow-primary-500/25"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -118,7 +129,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center">
             <button
               onClick={() => { setIsRegister(!isRegister); setError(null) }}
-              className="text-sm text-primary-400 hover:text-primary-300 transition-colors"
+              className="text-sm text-primary-500 dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 transition-colors"
             >
               {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Register"}
             </button>

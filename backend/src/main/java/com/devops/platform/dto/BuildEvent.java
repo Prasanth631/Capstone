@@ -21,6 +21,7 @@ public class BuildEvent {
     private String gitBranch;
     private String gitCommit;
     private String triggerType;    // push, PR, manual
+    private String jenkinsUrl;     // direct link to Jenkins build page
     private long timestamp;
     private Map<String, Object> testResults;
     private Map<String, Object> metadata;

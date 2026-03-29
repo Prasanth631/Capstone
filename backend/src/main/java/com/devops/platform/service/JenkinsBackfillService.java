@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.lang.Nullable;
@@ -40,6 +41,9 @@ public class JenkinsBackfillService {
     private final JenkinsProperties jenkinsProperties;
     private final RestTemplateBuilder restTemplateBuilder;
     private final ObjectMapper objectMapper;
+
+    @Value("${github.repo-url:https://github.com/Prasanth631/Capstone}")
+    private String githubRepoUrl;
 
     private RestTemplate restTemplate;
 
@@ -125,12 +129,15 @@ public class JenkinsBackfillService {
                 try {
                     List<JenkinsBuildSummary> builds = fetchBuildSummaries(jobUrl, perJobLimit);
                     for (JenkinsBuildSummary build : builds) {
+                        String buildJenkinsUrl = jobUrl.replaceAll("/+$", "") + "/" + build.buildNumber() + "/";
                         firestoreService.upsertBackfillBuild(
                                 jobName,
                                 build.buildNumber(),
                                 normalizeResult(build.result()),
                                 build.startTimeMs(),
-                                build.durationMs()
+                                build.durationMs(),
+                                buildJenkinsUrl,
+                                githubRepoUrl
                         );
                         buildsProcessed++;
                     }

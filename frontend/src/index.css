@@ -10,33 +10,89 @@
   *::-webkit-scrollbar { width: 6px; }
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 3px; }
+
+  /* Light mode base */
+  body {
+    @apply bg-surface-50 text-surface-900 transition-colors duration-300;
+  }
+  /* Dark mode base */
+  .dark body {
+    @apply bg-surface-950 text-white;
+  }
 }
 
 @layer components {
+  /* ─── Glass Card ─── */
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl;
+    @apply bg-white border border-surface-200 rounded-2xl shadow-sm;
+    @apply dark:bg-white/5 dark:backdrop-blur-xl dark:border-white/10 dark:shadow-xl;
   }
   .glass-card-hover {
-    @apply glass-card hover:bg-white/10 hover:border-primary-400/30 transition-all duration-300;
+    @apply glass-card transition-all duration-300;
+    @apply hover:shadow-md hover:border-primary-300;
+    @apply dark:hover:bg-white/10 dark:hover:border-primary-400/30;
   }
+
+  /* ─── Text Utilities ─── */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-400 to-purple-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-500 to-purple-500 bg-clip-text text-transparent;
+    @apply dark:from-primary-400 dark:to-purple-400;
   }
+  .text-heading {
+    @apply text-surface-900 dark:text-white;
+  }
+  .text-secondary {
+    @apply text-surface-500 dark:text-white/50;
+  }
+  .text-muted {
+    @apply text-surface-400 dark:text-white/30;
+  }
+
+  /* ─── Status Badges ─── */
   .status-badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
-  .status-success { @apply status-badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }
-  .status-failure { @apply status-badge bg-red-500/20 text-red-400 border border-red-500/30; }
-  .status-pending { @apply status-badge bg-yellow-500/20 text-yellow-400 border border-yellow-500/30; }
-  .status-running { @apply status-badge bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse; }
+  .status-success {
+    @apply status-badge bg-emerald-100 text-emerald-700 border border-emerald-200;
+    @apply dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30;
+  }
+  .status-failure {
+    @apply status-badge bg-red-100 text-red-700 border border-red-200;
+    @apply dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30;
+  }
+  .status-pending {
+    @apply status-badge bg-yellow-100 text-yellow-700 border border-yellow-200;
+    @apply dark:bg-yellow-500/20 dark:text-yellow-400 dark:border-yellow-500/30;
+  }
+  .status-running {
+    @apply status-badge bg-blue-100 text-blue-700 border border-blue-200 animate-pulse;
+    @apply dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30;
+  }
 
+  /* ─── Glow Effects (dark only) ─── */
   .glow {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05);
+    @apply dark:shadow-[0_0_20px_rgba(99,102,241,0.15),0_0_60px_rgba(99,102,241,0.05)];
   }
   .glow-success {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+    @apply dark:shadow-[0_0_20px_rgba(16,185,129,0.15)];
   }
   .glow-danger {
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+    @apply dark:shadow-[0_0_20px_rgba(239,68,68,0.15)];
+  }
+
+  /* ─── Input Fields ─── */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl text-sm transition-all duration-300;
+    @apply bg-surface-100 border border-surface-200 text-surface-900 placeholder:text-surface-400;
+    @apply focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100;
+    @apply dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/30;
+    @apply dark:focus:border-primary-400/50 dark:focus:ring-primary-500/20 dark:focus:bg-white/10;
+  }
+
+  /* ─── Panel inner card ─── */
+  .inner-card {
+    @apply p-4 rounded-xl border transition-all duration-300;
+    @apply bg-surface-50 border-surface-200;
+    @apply dark:bg-white/5 dark:border-white/10;
   }
 }
