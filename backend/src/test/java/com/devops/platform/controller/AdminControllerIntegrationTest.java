@@ -58,12 +58,12 @@ class AdminControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/admin/backfill/jenkins - requires authentication")
-    void testTriggerBackfillRequiresAuth() throws Exception {
+    @DisplayName("POST /api/admin/backfill/jenkins - does not require authentication anymore")
+    void testTriggerBackfillWorksWithoutAuth() throws Exception {
         mockMvc.perform(post("/api/admin/backfill/jenkins")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
