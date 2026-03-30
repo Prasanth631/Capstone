@@ -36,6 +36,15 @@ export default function Navbar({ lastRefresh }) {
                 <div className="h-4 w-px bg-surface-200 dark:bg-white/10" />
               </>
             )}
+            <Link to="/dashboard" className={`flex items-center gap-1.5 text-xs transition-colors ${location.pathname === '/dashboard' ? 'text-primary-600 dark:text-primary-400 font-bold' : 'text-surface-500 dark:text-white/50 hover:text-primary-600 dark:hover:text-primary-400'}`}>
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>CI/CD Dashboard</span>
+            </Link>
+            <Link to="/expense-tracker" className={`flex items-center gap-1.5 text-xs transition-colors ${location.pathname === '/expense-tracker' ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-surface-500 dark:text-white/50 hover:text-purple-600 dark:hover:text-purple-400'}`}>
+              <ReceiptText className="w-3.5 h-3.5" />
+              <span>ExpenseFlow</span>
+            </Link>
+            <div className="h-4 w-px bg-surface-200 dark:bg-white/10 mx-1" />
             <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer"
                className="flex items-center gap-1.5 text-xs text-surface-500 dark:text-white/50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
               <Github className="w-3.5 h-3.5" />
@@ -79,25 +88,6 @@ export default function Navbar({ lastRefresh }) {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center gap-6 mt-1 overflow-x-auto custom-scrollbar">
-          <Link to="/dashboard" className={`flex items-center gap-2 pb-3 px-1 border-b-2 text-sm font-medium transition-colors ${
-            location.pathname === '/dashboard' 
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400' 
-              : 'border-transparent text-surface-500 dark:text-muted hover:text-surface-800 dark:hover:text-white/80'
-          }`}>
-            <LayoutDashboard className="w-4 h-4" />
-            CI/CD Dashboard
-          </Link>
-          <Link to="/expense-tracker" className={`flex items-center gap-2 pb-3 px-1 border-b-2 text-sm font-medium transition-colors ${
-            location.pathname === '/expense-tracker' 
-              ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
-              : 'border-transparent text-surface-500 dark:text-muted hover:text-surface-800 dark:hover:text-white/80'
-          }`}>
-            <ReceiptText className="w-4 h-4" />
-            Expense Tracker
-          </Link>
-        </div>
       </header>
     </>
   )

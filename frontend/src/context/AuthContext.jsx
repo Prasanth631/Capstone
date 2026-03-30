@@ -4,9 +4,14 @@ import api from '../api/axios'
 
 const AuthContext = createContext(null)
 
+const safeJSONParse = (val) => {
+  try { return JSON.parse(val || 'null') } 
+  catch { return null }
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem('token'))
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'))
+  const [user, setUser] = useState(safeJSONParse(localStorage.getItem('user')))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
