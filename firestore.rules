@@ -2,21 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Dashboard collection (read-only from frontend)
-    match /dashboard/{document=**} {
-      allow read: if true;
-      allow write: if false; 
-    }
-    
-    // Builds collection (read-only from frontend)
-    match /builds/{document=**} {
-      allow read: if true;
-      allow write: if false; 
-    }
-    
-    // Expenses collection
-    match /expenses/{expenseId} {
+    match /{document=**} {
       allow read, write: if true;
     }
   }
