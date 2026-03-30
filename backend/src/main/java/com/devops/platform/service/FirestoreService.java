@@ -10,6 +10,7 @@ import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QuerySnapshot;
 import com.google.cloud.firestore.SetOptions;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -145,7 +146,7 @@ public class FirestoreService {
         }
     }
 
-    public void writeBackfillState(Map<String, Object> state) {
+    public void writeBackfillState(@NonNull Map<String, Object> state) {
         if (firestore == null) return;
         try {
             firestore.collection("backfillState").document("jenkins").set(state).get();
@@ -340,7 +341,8 @@ public class FirestoreService {
     @Nullable
     private PipelineStatus toPipelineStatus(DocumentSnapshot doc) {
         try {
-            Integer buildNumber = doc.getLong("buildNumber") != null ? doc.getLong("buildNumber").intValue() : null;
+            Long bnLong = doc.getLong("buildNumber");
+            Integer buildNumber = bnLong != null ? bnLong.intValue() : null;
             String jobName = doc.getString("jobName");
             if (buildNumber == null || jobName == null) return null;
 
@@ -365,14 +367,18 @@ public class FirestoreService {
                 }
             }
 
+            Long stLong = doc.getLong("startTime");
+            Long etLong = doc.getLong("endTime");
+            Long tdLong = doc.getLong("totalDuration");
+
             return PipelineStatus.builder()
                     .buildNumber(buildNumber)
                     .jobName(jobName)
                     .overallStatus(doc.getString("overallStatus"))
                     .stages(stages)
-                    .startTime(doc.getLong("startTime") != null ? doc.getLong("startTime") : 0L)
-                    .endTime(doc.getLong("endTime") != null ? doc.getLong("endTime") : 0L)
-                    .totalDuration(doc.getLong("totalDuration") != null ? doc.getLong("totalDuration") : 0L)
+                    .startTime(stLong != null ? stLong : 0L)
+                    .endTime(etLong != null ? etLong : 0L)
+                    .totalDuration(tdLong != null ? tdLong : 0L)
                     .gitBranch(doc.getString("gitBranch"))
                     .gitCommit(doc.getString("gitCommit"))
                     .triggerType(doc.getString("triggerType"))
@@ -389,6 +395,7 @@ public class FirestoreService {
         return ts > 0 ? ts : Instant.now().toEpochMilli();
     }
 
+    @NonNull
     private String buildDocId(String jobName, int buildNumber) {
         String safeJob = (jobName == null || jobName.isBlank() ? "unknown-job" : jobName)
                 .replace("/", "_");
