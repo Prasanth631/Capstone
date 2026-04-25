@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:classpath:application-local.yml
   # Removed H2 database - Using Firebase Firestore
 
 jwt:
@@ -14,5 +16,5 @@ firebase:
 jenkins:
   webhook-secret: ${JENKINS_WEBHOOK_SECRET:devops-webhook-secret-2024}
   base-url: ${JENKINS_BASE_URL:http://localhost:8080}
-  username: ${JENKINS_USERNAME:}
+  username: ${JENKINS_USERNAME:root}
   api-token: ${JENKINS_API_TOKEN:}

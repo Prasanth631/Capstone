@@ -25,6 +25,7 @@ Thumbs.db
 firebase-service-account.json
 **/firebase-service-account.json
 secrets/
+application-local.yml
 
 # ===== Node =====
 node_modules/
