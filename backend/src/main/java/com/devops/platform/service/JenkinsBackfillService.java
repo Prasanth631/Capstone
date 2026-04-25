@@ -39,6 +39,7 @@ public class JenkinsBackfillService {
 
     private final FirestoreService firestoreService;
     private final JenkinsProperties jenkinsProperties;
+    private final DashboardSyncService dashboardSyncService;
     private final RestTemplateBuilder restTemplateBuilder;
     private final ObjectMapper objectMapper;
 
@@ -160,6 +161,17 @@ public class JenkinsBackfillService {
             state.put("status", jobErrors == 0 ? "SUCCESS" : "PARTIAL_SUCCESS");
             state.put("sampleJobs", targetJobs.stream().limit(20).toList());
             firestoreService.writeBackfillState(state);
+
+            // Immediately refresh the dashboard overview so the frontend
+            // sees backfilled data without waiting for the next sync cycle.
+            if (buildsProcessed > 0) {
+                try {
+                    dashboardSyncService.syncDashboardData();
+                    log.info("Dashboard projection refreshed after backfill ({} builds)", buildsProcessed);
+                } catch (Exception ex) {
+                    log.warn("Post-backfill dashboard refresh failed: {}", ex.getMessage());
+                }
+            }
 
             boolean success = jobsProcessed > 0 && jobErrors == 0;
             String message = jobErrors == 0

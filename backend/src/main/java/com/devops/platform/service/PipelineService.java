@@ -38,6 +38,14 @@ public class PipelineService {
     // Transient in-memory state for active pipelines while webhook events are flowing
     private final Map<String, PipelineStatus> activePipelines = new ConcurrentHashMap<>();
     private final Map<String, Long> pipelineEventSequences = new ConcurrentHashMap<>();
+    private final Map<String, PipelineStatus> recentBuilds = new ConcurrentHashMap<>();
+    private volatile Map<String, Object> latestInMemoryTestResults = Map.of(
+            "totalTests", 0,
+            "passed", 0,
+            "failed", 0,
+            "skipped", 0,
+            "passRate", 0.0
+    );
 
     private static final List<String> PIPELINE_STAGES = List.of(
             "Checkout", "Build", "Unit & Integration Tests", "Static Analysis",
@@ -62,7 +70,8 @@ public class PipelineService {
     public void processWebhook(BuildEvent event) {
         String key = pipelineKey(event.getJobName(), event.getBuildNumber());
         long eventTimestamp = event.getTimestamp() > 0 ? event.getTimestamp() : Instant.now().toEpochMilli();
-        long eventSequence = pipelineEventSequences.merge(key, 1L, Long::sum);
+        long eventSequence = pipelineEventSequences.compute(key, (pipelineKey, sequence) ->
+            sequence == null ? 1L : sequence + 1L);
 
         event.setTimestamp(eventTimestamp);
         Map<String, Object> metadata = event.getMetadata() != null ? new HashMap<>(event.getMetadata()) : new HashMap<>();
@@ -80,6 +89,10 @@ public class PipelineService {
         }
 
         PipelineStatus status = updatePipelineState(event, eventTimestamp, eventSequence);
+        recentBuilds.put(key, snapshotPipelineStatus(status));
+        if (event.getTestResults() != null && !event.getTestResults().isEmpty()) {
+            latestInMemoryTestResults = new HashMap<>(event.getTestResults());
+        }
 
         int stageOrder = resolveStageOrder(status, event.getStage());
         event.getMetadata().put("stageOrder", stageOrder);
@@ -234,6 +247,40 @@ public class PipelineService {
         return stages;
     }
 
+    private PipelineStatus snapshotPipelineStatus(PipelineStatus status) {
+        if (status == null) {
+            return null;
+        }
+
+        List<PipelineStatus.StageInfo> stageSnapshots = new ArrayList<>();
+        if (status.getStages() != null) {
+            for (PipelineStatus.StageInfo stage : status.getStages()) {
+                stageSnapshots.add(PipelineStatus.StageInfo.builder()
+                        .name(stage.getName())
+                        .status(stage.getStatus())
+                        .duration(stage.getDuration())
+                        .order(stage.getOrder())
+                        .details(stage.getDetails() != null ? new HashMap<>(stage.getDetails()) : null)
+                        .build());
+            }
+        }
+
+        return PipelineStatus.builder()
+                .buildNumber(status.getBuildNumber())
+                .jobName(status.getJobName())
+                .overallStatus(status.getOverallStatus())
+                .stages(stageSnapshots)
+                .startTime(status.getStartTime())
+                .endTime(status.getEndTime())
+                .totalDuration(status.getTotalDuration())
+                .gitBranch(status.getGitBranch())
+                .gitCommit(status.getGitCommit())
+                .triggerType(status.getTriggerType())
+                .jenkinsUrl(status.getJenkinsUrl())
+                .githubUrl(status.getGithubUrl())
+                .build();
+    }
+
     private String extractNamespace(String stage) {
         String normalized = stage.toLowerCase();
         if (normalized.contains("production")) return "production";
@@ -275,9 +322,10 @@ public class PipelineService {
             return firestoreService.getPagedBuilds(limit, cursor);
         }
 
-        List<PipelineStatus> builds = activePipelines.values().stream()
+        List<PipelineStatus> builds = recentBuilds.values().stream()
                 .sorted(Comparator.comparingLong(PipelineStatus::getStartTime).reversed())
                 .limit(Math.max(limit, 1))
+                .map(this::snapshotPipelineStatus)
                 .toList();
         return PagedBuildResponse.builder().builds(builds).nextCursor(null).build();
     }
@@ -291,12 +339,12 @@ public class PipelineService {
             return firestoreService.getBuildAnalytics(1000);
         }
 
-        long totalBuilds = activePipelines.size();
-        long successCount = activePipelines.values().stream()
+        long totalBuilds = recentBuilds.size();
+        long successCount = recentBuilds.values().stream()
                 .filter(b -> "SUCCESS".equals(b.getOverallStatus()))
                 .count();
         double successRate = totalBuilds > 0 ? (double) successCount / totalBuilds * 100 : 0;
-        double avgDuration = activePipelines.values().stream()
+        double avgDuration = recentBuilds.values().stream()
                 .mapToLong(PipelineStatus::getTotalDuration)
                 .filter(d -> d > 0)
                 .average()
@@ -308,9 +356,9 @@ public class PipelineService {
                 "failureCount", totalBuilds - successCount,
                 "successRate", Math.round(successRate * 100.0) / 100.0,
                 "avgDurationMs", avgDuration,
-                "shortestBuildMs", activePipelines.values().stream()
+                "shortestBuildMs", recentBuilds.values().stream()
                         .mapToLong(PipelineStatus::getTotalDuration).filter(d -> d > 0).min().orElse(0),
-                "longestBuildMs", activePipelines.values().stream()
+                "longestBuildMs", recentBuilds.values().stream()
                         .mapToLong(PipelineStatus::getTotalDuration).max().orElse(0)
         );
     }
@@ -319,12 +367,6 @@ public class PipelineService {
         if (firestoreService.isAvailable()) {
             return firestoreService.getLatestTestResults();
         }
-        return Map.of(
-                "totalTests", 0,
-                "passed", 0,
-                "failed", 0,
-                "skipped", 0,
-                "passRate", 0.0
-        );
+        return new HashMap<>(latestInMemoryTestResults);
     }
 }
