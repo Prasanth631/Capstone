@@ -12,7 +12,7 @@ metadata:
   namespace: production
 data:
   SPRING_PROFILES_ACTIVE: "prod"
-  APP_CORS_ALLOWED_ORIGINS: "https://devops-platform.example.com"
+  APP_CORS_ALLOWED_ORIGINS: "http://localhost"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,16 +23,15 @@ metadata:
     app: devops-platform
     environment: production
 spec:
-  replicas: 3
-  minReadySeconds: 10
+  replicas: 1
   selector:
     matchLabels:
       app: devops-platform
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   template:
     metadata:
       labels:
@@ -70,11 +69,11 @@ spec:
               readOnly: true
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "2000m"
-              memory: "2Gi"
+              cpu: "500m"
+              memory: "768Mi"
           startupProbe:
             httpGet:
               path: /actuator/health
@@ -120,16 +119,15 @@ metadata:
     app: devops-frontend
     environment: production
 spec:
-  replicas: 2
-  minReadySeconds: 10
+  replicas: 1
   selector:
     matchLabels:
       app: devops-frontend
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   template:
     metadata:
       labels:
@@ -143,11 +141,11 @@ spec:
             - containerPort: 80
           resources:
             requests:
-              cpu: "100m"
-              memory: "192Mi"
+              cpu: "75m"
+              memory: "128Mi"
             limits:
-              cpu: "750m"
-              memory: "768Mi"
+              cpu: "500m"
+              memory: "512Mi"
           livenessProbe:
             httpGet:
               path: /
@@ -174,62 +172,17 @@ spec:
     - port: 80
       targetPort: 80
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: devops-platform-hpa
-  namespace: production
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: devops-platform
-  minReplicas: 3
-  maxReplicas: 10
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 60
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: devops-frontend-hpa
-  namespace: production
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: devops-frontend
-  minReplicas: 2
-  maxReplicas: 6
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 60
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: devops-platform-ingress
   namespace: production
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
-  tls:
-    - hosts:
-        - devops-platform.example.com
-      secretName: devops-platform-tls
   rules:
-    - host: devops-platform.example.com
+    - host: production.devops-platform.local
       http:
         paths:
           - path: /

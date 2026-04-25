@@ -225,7 +225,6 @@ pipeline {
                     bat 'kubectl get namespace %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%" || kubectl create namespace %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
                     bat 'kubectl get secret app-secrets -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
                     bat 'kubectl get secret firebase-service-account -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
-                    bat 'kubectl get secret devops-platform-tls -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
                     bat "kubectl apply -f k8s/production/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
