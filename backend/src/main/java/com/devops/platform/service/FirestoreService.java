@@ -43,7 +43,7 @@ public class FirestoreService {
         return firestore != null;
     }
 
-    public void appendBuildEvent(BuildEvent event) {
+    public void appendBuildEvent(BuildEvent event, long eventSequence) {
         if (firestore == null) {
             log.debug("Firestore unavailable - skipping appendBuildEvent for build #{}", event.getBuildNumber());
             return;
@@ -51,6 +51,7 @@ public class FirestoreService {
 
         try {
             String docId = buildDocId(event.getJobName(), event.getBuildNumber());
+            long eventTimestamp = normalizedTimestamp(event.getTimestamp());
             Map<String, Object> data = new HashMap<>();
             data.put("buildNumber", event.getBuildNumber());
             data.put("jobName", event.getJobName());
@@ -60,25 +61,60 @@ public class FirestoreService {
             data.put("gitBranch", event.getGitBranch());
             data.put("gitCommit", event.getGitCommit());
             data.put("triggerType", event.getTriggerType());
-            data.put("timestamp", normalizedTimestamp(event.getTimestamp()));
+            data.put("timestamp", eventTimestamp);
+            data.put("eventTimestamp", eventTimestamp);
+            data.put("eventSequence", eventSequence);
             data.put("metadata", event.getMetadata());
             data.put("testResults", event.getTestResults());
 
             firestore.collection("builds")
                     .document(docId)
                     .collection("events")
-                    .add(data)
+                    .document(buildEventDocId(eventTimestamp, eventSequence))
+                    .set(data)
                     .get();
 
             Map<String, Object> lastEvent = new HashMap<>();
             lastEvent.put("lastStage", event.getStage());
             lastEvent.put("lastStatus", event.getStatus());
+            lastEvent.put("lastEventTimestamp", eventTimestamp);
+            lastEvent.put("lastEventSequence", eventSequence);
             lastEvent.put("lastUpdated", Instant.now().toEpochMilli());
             firestore.collection("builds").document(docId).set(lastEvent, SetOptions.merge()).get();
 
             log.info("Build event appended to Firestore: {}", docId);
         } catch (Exception e) {
             log.error("Failed to append build event to Firestore", e);
+        }
+    }
+
+    public void appendDashboardEvent(BuildEvent event, PipelineStatus status, long eventSequence, long eventTimestamp) {
+        if (firestore == null) {
+            return;
+        }
+
+        try {
+            Map<String, Object> feedEvent = new HashMap<>();
+            feedEvent.put("jobName", event.getJobName());
+            feedEvent.put("buildNumber", event.getBuildNumber());
+            feedEvent.put("stage", event.getStage());
+            feedEvent.put("stageOrder", numberFrom(event.getMetadata(), "stageOrder", 0));
+            feedEvent.put("stageStatus", event.getStatus());
+            feedEvent.put("overallStatus", status.getOverallStatus());
+            feedEvent.put("duration", event.getDuration());
+            feedEvent.put("gitBranch", event.getGitBranch());
+            feedEvent.put("gitCommit", event.getGitCommit());
+            feedEvent.put("triggerType", event.getTriggerType());
+            feedEvent.put("eventTimestamp", eventTimestamp);
+            feedEvent.put("eventSequence", eventSequence);
+            feedEvent.put("source", "jenkins-webhook");
+
+            firestore.collection("dashboardEvents")
+                    .document(dashboardEventDocId(eventTimestamp, event.getBuildNumber(), eventSequence))
+                    .set(feedEvent)
+                    .get();
+        } catch (Exception e) {
+            log.error("Failed to append dashboard event to Firestore", e);
         }
     }
 
@@ -387,6 +423,54 @@ public class FirestoreService {
         }
     }
 
+    public void upsertRealtimeDashboardProjection(List<PipelineStatus> activePipelines,
+                                                  PagedBuildResponse pagedBuilds,
+                                                  Map<String, Object> buildAnalytics,
+                                                  Map<String, Object> latestTestResults,
+                                                  PipelineStatus pipelineStatus,
+                                                  BuildEvent event,
+                                                  long eventSequence,
+                                                  long eventTimestamp) {
+        if (firestore == null) {
+            return;
+        }
+
+        Map<String, Object> dashboardData = new HashMap<>();
+        dashboardData.put("pipelines", activePipelines != null ? activePipelines : List.of());
+        dashboardData.put("recentBuilds", pagedBuilds != null ? pagedBuilds.getBuilds() : List.of());
+        dashboardData.put("recentBuildsNextCursor", pagedBuilds != null ? pagedBuilds.getNextCursor() : null);
+        dashboardData.put("buildAnalytics", buildAnalytics != null ? buildAnalytics : Map.of());
+        dashboardData.put("testResults", latestTestResults != null ? latestTestResults : Map.of());
+        dashboardData.put("pipelineLastUpdated", eventTimestamp);
+        dashboardData.put("lastUpdated", eventTimestamp);
+        dashboardData.put("pipelineFreshness", Map.of(
+                "eventTimestamp", eventTimestamp,
+                "eventSequence", eventSequence,
+                "jobName", event.getJobName(),
+                "buildNumber", event.getBuildNumber(),
+                "stage", event.getStage(),
+                "stageStatus", event.getStatus(),
+                "stageOrder", numberFrom(event.getMetadata(), "stageOrder", 0),
+                "overallStatus", pipelineStatus.getOverallStatus()
+        ));
+
+        mergeDashboardOverview(dashboardData);
+    }
+
+    public void mergeDashboardOverview(Map<String, Object> dashboardData) {
+        if (firestore == null || dashboardData == null || dashboardData.isEmpty()) {
+            return;
+        }
+
+        try {
+            firestore.collection("dashboard").document("overview")
+                    .set(dashboardData, SetOptions.merge())
+                    .get();
+        } catch (Exception e) {
+            log.error("Failed to merge dashboard overview", e);
+        }
+    }
+
     @Nullable
     private PipelineStatus toPipelineStatus(DocumentSnapshot doc) {
         try {
@@ -442,6 +526,22 @@ public class FirestoreService {
 
     private long normalizedTimestamp(long ts) {
         return ts > 0 ? ts : Instant.now().toEpochMilli();
+    }
+
+    private long numberFrom(@Nullable Map<String, Object> data, String key, long fallback) {
+        if (data == null) return fallback;
+        Object value = data.get(key);
+        return value instanceof Number number ? number.longValue() : fallback;
+    }
+
+    @NonNull
+    private String buildEventDocId(long eventTimestamp, long eventSequence) {
+        return String.format("%013d-%08d", eventTimestamp, eventSequence);
+    }
+
+    @NonNull
+    private String dashboardEventDocId(long eventTimestamp, int buildNumber, long eventSequence) {
+        return String.format("%013d-%08d-%08d", eventTimestamp, buildNumber, eventSequence);
     }
 
     @NonNull

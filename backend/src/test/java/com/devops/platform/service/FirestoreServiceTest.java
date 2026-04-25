@@ -36,7 +36,7 @@ class FirestoreServiceTest {
         void appendBuildEventShouldNotThrow() {
             BuildEvent event = BuildEvent.builder()
                     .buildNumber(1).jobName("test").stage("Build").status("SUCCESS").build();
-            assertThatCode(() -> firestoreService.appendBuildEvent(event))
+            assertThatCode(() -> firestoreService.appendBuildEvent(event, 1))
                     .doesNotThrowAnyException();
         }
 
@@ -104,6 +104,13 @@ class FirestoreServiceTest {
         void upsertBackfillBuildShouldNotThrow() {
             assertThatCode(() -> firestoreService.upsertBackfillBuild(
                     "job", 1, "SUCCESS", System.currentTimeMillis(), 1000L, null, null))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("mergeDashboardOverview should not throw")
+        void mergeDashboardOverviewShouldNotThrow() {
+            assertThatCode(() -> firestoreService.mergeDashboardOverview(Map.of("lastUpdated", System.currentTimeMillis())))
                     .doesNotThrowAnyException();
         }
     }

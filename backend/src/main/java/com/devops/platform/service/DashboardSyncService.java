@@ -1,9 +1,7 @@
 package com.devops.platform.service;
 
-import com.google.cloud.firestore.Firestore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -16,45 +14,26 @@ import java.util.Map;
 @Slf4j
 public class DashboardSyncService {
 
-    @Nullable
-    private final Firestore firestore;
-    private final PipelineService pipelineService;
     private final MetricsService metricsService;
     private final FirestoreService firestoreService;
 
-    // Run every 5 seconds
-    @Scheduled(fixedRate = 5000)
+    // Refresh infra/system telemetry only; pipeline state is pushed immediately by webhook events.
+    @Scheduled(fixedRateString = "${dashboard.metrics-refresh-ms:5000}")
     public void syncDashboardData() {
-        if (firestore == null) {
+        if (!firestoreService.isAvailable()) {
             return;
         }
 
         try {
+            long now = Instant.now().toEpochMilli();
             Map<String, Object> dashboardData = new HashMap<>();
-            var pagedBuilds = pipelineService.getPagedBuilds(20, null);
-            
-            // 1. Pipeline Status (Active & Recent)
-            dashboardData.put("pipelines", pipelineService.getAllActivePipelines());
-            dashboardData.put("recentBuilds", pagedBuilds.getBuilds());
-            dashboardData.put("recentBuildsNextCursor", pagedBuilds.getNextCursor());
-            dashboardData.put("buildAnalytics", pipelineService.getBuildAnalytics());
-
-            // 2. System Metrics (JVM & OS)
             dashboardData.put("metrics", metricsService.getSystemMetrics());
-
-            // 3. Docker & K8s Live CLI Status
             dashboardData.put("dockerStatus", metricsService.getDockerStatus());
             dashboardData.put("k8sStatus", metricsService.getKubernetesStatus());
-
-            // 4. Test Results Summary — real data from most recent build with test results
-            dashboardData.put("testResults", firestoreService.getLatestTestResults());
-
-            dashboardData.put("lastUpdated", Instant.now().toEpochMilli());
-
-            // Write to a single aggregated document for the dashboard to listen to
-            firestore.collection("dashboard").document("overview").set(dashboardData).get();
-            
-            log.debug("Successfully synced real-time dashboard data to Firestore");
+            dashboardData.put("metricsLastUpdated", now);
+            dashboardData.put("lastUpdated", now);
+            firestoreService.mergeDashboardOverview(dashboardData);
+            log.debug("Successfully refreshed dashboard infra telemetry");
         } catch (Exception e) {
             log.error("Error syncing dashboard data to Firestore", e);
         }

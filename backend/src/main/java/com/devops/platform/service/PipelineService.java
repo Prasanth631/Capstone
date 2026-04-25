@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +37,7 @@ public class PipelineService {
 
     // Transient in-memory state for active pipelines while webhook events are flowing
     private final Map<String, PipelineStatus> activePipelines = new ConcurrentHashMap<>();
+    private final Map<String, Long> pipelineEventSequences = new ConcurrentHashMap<>();
 
     private static final List<String> PIPELINE_STAGES = List.of(
             "Checkout", "Build", "Unit & Integration Tests", "Static Analysis",
@@ -58,6 +60,17 @@ public class PipelineService {
     }
 
     public void processWebhook(BuildEvent event) {
+        String key = pipelineKey(event.getJobName(), event.getBuildNumber());
+        long eventTimestamp = event.getTimestamp() > 0 ? event.getTimestamp() : Instant.now().toEpochMilli();
+        long eventSequence = pipelineEventSequences.merge(key, 1L, Long::sum);
+
+        event.setTimestamp(eventTimestamp);
+        Map<String, Object> metadata = event.getMetadata() != null ? new HashMap<>(event.getMetadata()) : new HashMap<>();
+        metadata.put("eventTimestamp", eventTimestamp);
+        metadata.put("eventSequence", eventSequence);
+        metadata.put("pipelineKey", key);
+        event.setMetadata(metadata);
+
         log.info("Processing webhook: job={}, build=#{}, stage={}, status={}",
                 event.getJobName(), event.getBuildNumber(), event.getStage(), event.getStatus());
 
@@ -66,7 +79,10 @@ public class PipelineService {
             buildDurationTimer.record(event.getDuration(), TimeUnit.MILLISECONDS);
         }
 
-        PipelineStatus status = updatePipelineState(event);
+        PipelineStatus status = updatePipelineState(event, eventTimestamp, eventSequence);
+
+        int stageOrder = resolveStageOrder(status, event.getStage());
+        event.getMetadata().put("stageOrder", stageOrder);
 
         // Construct URLs if not already provided by the webhook
         if (status.getJenkinsUrl() == null || status.getJenkinsUrl().isBlank()) {
@@ -82,10 +98,14 @@ public class PipelineService {
 
         // Persist canonical summary + raw event stream in Firestore
         firestoreService.upsertBuildSummary(status, event.getGitCommit(), "webhook", event.getTestResults());
-        firestoreService.appendBuildEvent(event);
+        firestoreService.appendBuildEvent(event, eventSequence);
+        firestoreService.appendDashboardEvent(event, status, eventSequence, eventTimestamp);
+        refreshDashboardProjection(status, event, eventSequence, eventTimestamp);
 
         if (isTerminalStatus(status.getOverallStatus())) {
-            activePipelines.remove(pipelineKey(status.getJobName(), status.getBuildNumber()));
+            String completedKey = pipelineKey(status.getJobName(), status.getBuildNumber());
+            activePipelines.remove(completedKey);
+            pipelineEventSequences.remove(completedKey);
         }
 
         if (event.getStage() != null && event.getStage().toLowerCase().contains("deploy")) {
@@ -95,9 +115,8 @@ public class PipelineService {
         }
     }
 
-    private PipelineStatus updatePipelineState(BuildEvent event) {
+    private PipelineStatus updatePipelineState(BuildEvent event, long timestamp, long eventSequence) {
         String key = pipelineKey(event.getJobName(), event.getBuildNumber());
-        long timestamp = event.getTimestamp() > 0 ? event.getTimestamp() : Instant.now().toEpochMilli();
 
         return activePipelines.compute(key, (pipelineKey, existing) -> {
             PipelineStatus status = existing != null ? existing : PipelineStatus.builder()
@@ -125,6 +144,7 @@ public class PipelineService {
                     if (event.getStage().equalsIgnoreCase(stage.getName())) {
                         stage.setStatus(event.getStatus());
                         stage.setDuration(event.getDuration());
+                        stage.setDetails(stageDetails(stage.getDetails(), timestamp, eventSequence));
                         matched = true;
                         break;
                     }
@@ -137,6 +157,7 @@ public class PipelineService {
                             .status(event.getStatus())
                             .duration(event.getDuration())
                             .order(status.getStages().size() + 1)
+                            .details(stageDetails(null, timestamp, eventSequence))
                             .build());
                 }
             }
@@ -158,6 +179,47 @@ public class PipelineService {
 
             return status;
         });
+    }
+
+    private Map<String, Object> stageDetails(Map<String, Object> existing, long eventTimestamp, long eventSequence) {
+        Map<String, Object> details = existing != null ? new HashMap<>(existing) : new HashMap<>();
+        details.put("lastEventTimestamp", eventTimestamp);
+        details.put("lastEventSequence", eventSequence);
+        return details;
+    }
+
+    private int resolveStageOrder(PipelineStatus status, String stageName) {
+        if (status == null || stageName == null || stageName.isBlank() || status.getStages() == null) {
+            return 0;
+        }
+        return status.getStages().stream()
+                .filter(stage -> stageName.equalsIgnoreCase(stage.getName()))
+                .mapToInt(PipelineStatus.StageInfo::getOrder)
+                .findFirst()
+                .orElse(0);
+    }
+
+    private void refreshDashboardProjection(PipelineStatus status, BuildEvent event,
+                                            long eventSequence, long eventTimestamp) {
+        if (!firestoreService.isAvailable()) {
+            return;
+        }
+
+        PagedBuildResponse pagedBuilds = getPagedBuilds(20, null);
+        Map<String, Object> latestTestResults = (event.getTestResults() != null && !event.getTestResults().isEmpty())
+                ? event.getTestResults()
+                : getLatestTestResults();
+
+        firestoreService.upsertRealtimeDashboardProjection(
+                getAllActivePipelines(),
+                pagedBuilds,
+                getBuildAnalytics(),
+                latestTestResults,
+                status,
+                event,
+                eventSequence,
+                eventTimestamp
+        );
     }
 
     private List<PipelineStatus.StageInfo> buildInitialStages() {

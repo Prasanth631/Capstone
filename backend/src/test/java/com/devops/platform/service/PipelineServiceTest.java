@@ -89,11 +89,13 @@ class PipelineServiceTest {
         @Test
         @DisplayName("should persist build summary to Firestore")
         void shouldPersistBuildSummary() {
+            when(firestoreService.isAvailable()).thenReturn(false);
             BuildEvent event = buildEvent("Build", "SUCCESS", 4);
             pipelineService.processWebhook(event);
 
             verify(firestoreService).upsertBuildSummary(any(PipelineStatus.class), eq("abc123"), eq("webhook"), any());
-            verify(firestoreService).appendBuildEvent(event);
+            verify(firestoreService).appendBuildEvent(eq(event), anyLong());
+            verify(firestoreService).appendDashboardEvent(eq(event), any(PipelineStatus.class), anyLong(), anyLong());
         }
 
         @Test
