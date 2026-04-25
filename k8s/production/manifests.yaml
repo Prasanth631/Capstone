@@ -5,6 +5,15 @@ metadata:
   labels:
     environment: production
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: production
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  APP_CORS_ALLOWED_ORIGINS: "https://devops-platform.example.com"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,12 +23,16 @@ metadata:
     app: devops-platform
     environment: production
 spec:
-  replicas: 1
+  replicas: 3
+  minReadySeconds: 10
   selector:
     matchLabels:
       app: devops-platform
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   template:
     metadata:
       labels:
@@ -57,8 +70,8 @@ spec:
               readOnly: true
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
+              cpu: "250m"
+              memory: "512Mi"
             limits:
               cpu: "2000m"
               memory: "2Gi"
@@ -91,12 +104,75 @@ metadata:
   name: devops-platform
   namespace: production
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: devops-platform
   ports:
-    - port: 80
+    - port: 8082
       targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-frontend
+  namespace: production
+  labels:
+    app: devops-frontend
+    environment: production
+spec:
+  replicas: 2
+  minReadySeconds: 10
+  selector:
+    matchLabels:
+      app: devops-frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: devops-frontend
+        environment: production
+    spec:
+      containers:
+        - name: devops-frontend
+          image: prasanth631/devops-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "192Mi"
+            limits:
+              cpu: "750m"
+              memory: "768Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-frontend
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: devops-frontend
+  ports:
+    - port: 80
+      targetPort: 80
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -108,7 +184,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: devops-platform
-  minReplicas: 2
+  minReplicas: 3
   maxReplicas: 10
   metrics:
     - type: Resource
@@ -118,14 +194,25 @@ spec:
           type: Utilization
           averageUtilization: 60
 ---
-apiVersion: v1
-kind: ConfigMap
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
 metadata:
-  name: app-config
+  name: devops-frontend-hpa
   namespace: production
-data:
-  SPRING_PROFILES_ACTIVE: "prod"
-  APP_CORS_ALLOWED_ORIGINS: "https://devops-platform.example.com"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: devops-frontend
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -133,10 +220,14 @@ metadata:
   name: devops-platform-ingress
   namespace: production
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - devops-platform.example.com
+      secretName: devops-platform-tls
   rules:
     - host: devops-platform.example.com
       http:
@@ -145,6 +236,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: devops-platform
+                name: devops-frontend
                 port:
                   number: 80

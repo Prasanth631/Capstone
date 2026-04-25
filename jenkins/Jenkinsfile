@@ -6,22 +6,37 @@ pipeline {
         jdk 'JDK22'
     }
 
+    parameters {
+        string(name: 'BACKEND_IMAGE', defaultValue: 'prasanth631/devops-platform', description: 'Docker image repository for backend')
+        string(name: 'FRONTEND_IMAGE', defaultValue: 'prasanth631/devops-frontend', description: 'Docker image repository for frontend')
+        string(name: 'WEBHOOK_URL', defaultValue: 'http://localhost:8082/api/webhook/jenkins', description: 'Signed Jenkins webhook endpoint')
+        string(name: 'API_TEST_SUITE', defaultValue: 'DashboardControllerIntegrationTest,PipelineWebhookControllerIntegrationTest', description: 'Comma-separated Maven integration tests for API stage')
+        string(name: 'DEV_NAMESPACE', defaultValue: 'dev', description: 'Kubernetes namespace for dev environment')
+        string(name: 'STAGING_NAMESPACE', defaultValue: 'staging', description: 'Kubernetes namespace for staging environment')
+        string(name: 'PRODUCTION_NAMESPACE', defaultValue: 'production', description: 'Kubernetes namespace for production environment')
+        string(name: 'MANIFEST_FILE', defaultValue: 'manifests.yaml', description: 'Manifest file name used in each k8s/<env>/ directory')
+    }
+
     environment {
-        DOCKER_IMAGE       = 'prasanth631/devops-platform'
-        FRONTEND_IMAGE     = 'prasanth631/devops-frontend'
-        DOCKER_CREDS       = credentials('dockerhub-credentials')
-        WEBHOOK_URL        = 'http://localhost:8082/api/webhook/jenkins'
-        DOCKER_BUILDKIT    = '1'   // Enable BuildKit for faster, parallel layer builds
+        DOCKER_IMAGE        = "${params.BACKEND_IMAGE}"
+        FRONTEND_IMAGE      = "${params.FRONTEND_IMAGE}"
+        WEBHOOK_URL         = "${params.WEBHOOK_URL}"
+        API_TEST_SUITE      = "${params.API_TEST_SUITE}"
+        DEV_NAMESPACE       = "${params.DEV_NAMESPACE}"
+        STAGING_NAMESPACE   = "${params.STAGING_NAMESPACE}"
+        PRODUCTION_NAMESPACE = "${params.PRODUCTION_NAMESPACE}"
+        MANIFEST_FILE       = "${params.MANIFEST_FILE}"
+        DOCKER_BUILDKIT     = '1'
+        WEBHOOK_TOKEN       = credentials('jenkins-webhook-secret')
     }
 
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         timestamps()
         disableConcurrentBuilds()
     }
 
     stages {
-        // ===== STAGE 1: Checkout =====
         stage('Checkout') {
             steps {
                 notifyWebhook('Checkout', 'IN_PROGRESS')
@@ -29,30 +44,29 @@ pipeline {
                 checkout scm
                 notifyWebhook('Checkout', 'SUCCESS')
             }
+            post {
+                failure { notifyWebhook('Checkout', 'FAILURE') }
+            }
         }
 
-        // ===== STAGE 2: Build =====
         stage('Build') {
             steps {
                 notifyWebhook('Build', 'IN_PROGRESS')
                 dir('backend') {
-                    bat 'mvn clean package -DskipTests -B'
+                    bat 'mvn -B clean package -DskipTests'
                 }
                 notifyWebhook('Build', 'SUCCESS')
             }
             post {
-                failure {
-                    notifyWebhook('Build', 'FAILURE')
-                }
+                failure { notifyWebhook('Build', 'FAILURE') }
             }
         }
 
-        // ===== STAGE 3: Unit & Integration Tests =====
         stage('Unit & Integration Tests') {
             steps {
                 notifyWebhook('Unit & Integration Tests', 'IN_PROGRESS')
                 dir('backend') {
-                    bat 'mvn clean test -B'
+                    bat 'mvn -B test'
                 }
                 notifyWebhook('Unit & Integration Tests', 'SUCCESS')
             }
@@ -63,100 +77,113 @@ pipeline {
                         jacoco execPattern: '**/target/jacoco.exec'
                     }
                 }
-                failure {
-                    notifyWebhook('Unit & Integration Tests', 'FAILURE')
-                }
+                failure { notifyWebhook('Unit & Integration Tests', 'FAILURE') }
             }
         }
 
-        // ===== STAGE 4: Docker Build & Push =====
+        stage('Static Analysis') {
+            steps {
+                notifyWebhook('Static Analysis', 'IN_PROGRESS')
+                dir('backend') {
+                    bat 'mvn -B -DskipTests verify -Djacoco.skip=true'
+                }
+                notifyWebhook('Static Analysis', 'SUCCESS')
+            }
+            post {
+                failure { notifyWebhook('Static Analysis', 'FAILURE') }
+            }
+        }
+
+        stage('API Tests') {
+            steps {
+                notifyWebhook('API Tests', 'IN_PROGRESS')
+                dir('backend') {
+                    bat "mvn -B -Dtest=%API_TEST_SUITE% test"
+                }
+                notifyWebhook('API Tests', 'SUCCESS')
+            }
+            post {
+                failure { notifyWebhook('API Tests', 'FAILURE') }
+            }
+        }
+
         stage('Docker Build & Push') {
             steps {
                 notifyWebhook('Docker Build & Push', 'IN_PROGRESS')
 
-                // Login to Docker Hub
-                bat "docker login -u %DOCKER_CREDS_USR% -p %DOCKER_CREDS_PSW%"
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    bat '@echo %DOCKER_PASS% | docker login --username %DOCKER_USER% --password-stdin'
+                }
 
-                // Backend Docker image
                 dir('backend') {
                     bat "docker build -t %DOCKER_IMAGE%:%BUILD_NUMBER% -t %DOCKER_IMAGE%:latest ."
                 }
 
-                // Frontend Docker image
                 dir('frontend') {
                     bat "docker build -t %FRONTEND_IMAGE%:%BUILD_NUMBER% -t %FRONTEND_IMAGE%:latest ."
                 }
 
-                // Push backend images
                 bat "docker push %DOCKER_IMAGE%:%BUILD_NUMBER%"
                 bat "docker push %DOCKER_IMAGE%:latest"
-
-                // Push frontend images
                 bat "docker push %FRONTEND_IMAGE%:%BUILD_NUMBER%"
                 bat "docker push %FRONTEND_IMAGE%:latest"
+                bat 'docker logout'
 
                 notifyWebhook('Docker Build & Push', 'SUCCESS')
             }
             post {
-                failure {
-                    notifyWebhook('Docker Build & Push', 'FAILURE')
-                }
+                failure { notifyWebhook('Docker Build & Push', 'FAILURE') }
             }
         }
 
-        // ===== STAGE 5: Deploy to Dev =====
         stage('Deploy to Dev') {
             steps {
                 notifyWebhook('Deploy to Dev', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl apply -f k8s/dev/ --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n dev --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl rollout status deployment/devops-platform -n dev --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl apply -f k8s/dev/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %DEV_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %DEV_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n %DEV_NAMESPACE% --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-frontend -n %DEV_NAMESPACE% --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Dev', 'SUCCESS')
             }
             post {
-                failure {
-                    notifyWebhook('Deploy to Dev', 'FAILURE')
-                }
+                failure { notifyWebhook('Deploy to Dev', 'FAILURE') }
             }
         }
 
-        // ===== STAGE 6: Smoke Test =====
         stage('Smoke Test') {
             steps {
                 notifyWebhook('Smoke Test', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl wait --for=condition=ready pod -l app=devops-platform -n dev --timeout=120s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl wait --for=condition=available deployment/devops-platform -n %DEV_NAMESPACE% --timeout=180s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl wait --for=condition=available deployment/devops-frontend -n %DEV_NAMESPACE% --timeout=180s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Smoke Test', 'SUCCESS')
             }
             post {
-                failure {
-                    notifyWebhook('Smoke Test', 'FAILURE')
-                }
+                failure { notifyWebhook('Smoke Test', 'FAILURE') }
             }
         }
 
-        // ===== STAGE 7: Deploy to Staging =====
         stage('Deploy to Staging') {
             steps {
                 notifyWebhook('Deploy to Staging', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl apply -f k8s/staging/ --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n staging --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl rollout status deployment/devops-platform -n staging --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl apply -f k8s/staging/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %STAGING_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %STAGING_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n %STAGING_NAMESPACE% --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-frontend -n %STAGING_NAMESPACE% --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Staging', 'SUCCESS')
             }
             post {
-                failure {
-                    notifyWebhook('Deploy to Staging', 'FAILURE')
-                }
+                failure { notifyWebhook('Deploy to Staging', 'FAILURE') }
             }
         }
 
-        // ===== STAGE 8: Manual Approval =====
         stage('Manual Approval') {
             steps {
                 notifyWebhook('Manual Approval', 'IN_PROGRESS')
@@ -165,23 +192,24 @@ pipeline {
             }
         }
 
-        // ===== STAGE 9: Deploy to Production =====
         stage('Deploy to Production') {
             steps {
                 notifyWebhook('Deploy to Production', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                    bat "kubectl apply -f k8s/production/ --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n production --kubeconfig=\"%KUBECONFIG%\""
-                    bat "kubectl rollout status deployment/devops-platform -n production --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl apply -f k8s/production/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-platform -n %PRODUCTION_NAMESPACE% --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
+                    bat "kubectl rollout status deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --timeout=300s --kubeconfig=\"%KUBECONFIG%\""
                 }
                 notifyWebhook('Deploy to Production', 'SUCCESS')
             }
             post {
                 failure {
                     notifyWebhook('Deploy to Production', 'FAILURE')
-                    // Auto-rollback on production failure
                     withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
-                        bat "kubectl rollout undo deployment/devops-platform -n production --kubeconfig=\"%KUBECONFIG%\""
+                        bat "kubectl rollout undo deployment/devops-platform -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                        bat "kubectl rollout undo deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     }
                 }
             }
@@ -190,18 +218,17 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline completed successfully!'
+            echo 'Pipeline completed successfully'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo 'Pipeline failed'
         }
         always {
-            echo 'Pipeline execution finished.'
+            echo 'Pipeline execution finished'
         }
     }
 }
 
-// ───── Helper: Send webhook notification to Spring Boot ─────
 def notifyWebhook(String stageName, String status) {
     try {
         def payload = """{
@@ -213,15 +240,21 @@ def notifyWebhook(String stageName, String status) {
             "gitBranch": "${env.GIT_BRANCH ?: 'unknown'}",
             "gitCommit": "${env.GIT_COMMIT ?: 'unknown'}",
             "triggerType": "${currentBuild.getBuildCauses()[0]?.shortDescription ?: 'unknown'}",
-            "timestamp": ${System.currentTimeMillis()}
+            "jenkinsUrl": "${env.BUILD_URL ?: ''}",
+            "timestamp": ${System.currentTimeMillis()},
+            "metadata": {
+              "buildTag": "${env.BUILD_TAG ?: ''}",
+              "nodeName": "${env.NODE_NAME ?: ''}"
+            }
         }"""
 
         httpRequest(
             url: env.WEBHOOK_URL,
             httpMode: 'POST',
+            customHeaders: [[name: 'X-Jenkins-Webhook-Token', value: env.WEBHOOK_TOKEN, maskValue: true]],
             contentType: 'APPLICATION_JSON',
             requestBody: payload,
-            validResponseCodes: '100:599',  // Never fail the pipeline on webhook errors
+            validResponseCodes: '100:599',
             quiet: true
         )
     } catch (Exception e) {

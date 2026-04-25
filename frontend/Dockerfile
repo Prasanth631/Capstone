@@ -6,6 +6,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+ARG VITE_JENKINS_BASE_URL=http://localhost:8080
+ENV VITE_JENKINS_BASE_URL=$VITE_JENKINS_BASE_URL
 RUN npm run build
 
 # ===== Stage 2: Serve =====
