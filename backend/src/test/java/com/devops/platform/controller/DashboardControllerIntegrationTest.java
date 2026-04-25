@@ -122,10 +122,9 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/firebase-token returns 503 when Firebase is unavailable")
+    @DisplayName("GET /api/dashboard/firebase-token works without auth and returns 503 when Firebase is unavailable")
     void testGetFirebaseTokenWhenFirebaseUnavailable() throws Exception {
-        mockMvc.perform(get("/api/dashboard/firebase-token")
-                        .header("Authorization", "Bearer " + authToken))
+        mockMvc.perform(get("/api/dashboard/firebase-token"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.success").value(false));
     }

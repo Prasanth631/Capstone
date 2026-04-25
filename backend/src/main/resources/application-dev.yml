@@ -1,2 +1,7 @@
 spring:
   # Removed H2 database - Using Firebase Firestore
+
+jwt:
+  # Local-dev fallback; production/staging should still provide JWT_SECRET via environment.
+  secret: ${JWT_SECRET:dev-local-jwt-secret-change-this-before-sharing-1234567890}
+  expiration: 86400000

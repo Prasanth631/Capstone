@@ -106,9 +106,9 @@ export default function Navbar({ lastRefresh }) {
                 </button>
               </>
             ) : (
-                <Link to="/login" className="px-4 py-1.5 rounded-lg text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors">
-                  Sign In
-                </Link>
+              <div className="px-3 py-1.5 rounded-lg text-sm font-medium border border-surface-200 dark:border-white/10 bg-surface-100 dark:bg-white/5 text-surface-600 dark:text-white/70">
+                Guest Mode
+              </div>
             )}
           </div>
         </div>

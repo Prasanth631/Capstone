@@ -25,7 +25,6 @@ import FailureSpotlightCard from '../components/FailureSpotlightCard'
 import OpsKpiSummary from '../components/OpsKpiSummary'
 import api from '../api/axios'
 import { db, firebaseAuth, isFirebaseConfigured } from '../firebase'
-import { useAuth } from '../context/AuthContext'
 
 function SkeletonCard({ className = '' }) {
   return (
@@ -79,7 +78,6 @@ function mapSimpleDoc(snapshot) {
 
 export default function DashboardPage() {
   const pageSize = 40
-  const { token, user } = useAuth()
 
   const [data, setData] = useState({
     pipelineStatus: [],
@@ -101,7 +99,7 @@ export default function DashboardPage() {
   const [deployments, setDeployments] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(new Date())
-  const [connectionStatus, setConnectionStatus] = useState('authenticating')
+  const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [firebaseReady, setFirebaseReady] = useState(false)
   const [usingFallback, setUsingFallback] = useState(false)
 
@@ -119,10 +117,6 @@ export default function DashboardPage() {
     let active = true
 
     const bootstrapFirebaseSession = async () => {
-      if (!token) {
-        setFirebaseReady(false)
-        return
-      }
       if (!isFirebaseConfigured()) {
         setConnectionStatus('error')
         setLoading(false)
@@ -155,7 +149,7 @@ export default function DashboardPage() {
     return () => {
       active = false
     }
-  }, [token, user?.username])
+  }, [])
 
   useEffect(() => {
     if (!firebaseReady) {

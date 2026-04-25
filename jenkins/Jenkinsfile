@@ -140,6 +140,10 @@ pipeline {
             steps {
                 notifyWebhook('Deploy to Dev', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                    bat 'if not exist k8s\\dev\\%MANIFEST_FILE% (echo [ERROR] Missing manifest: k8s/dev/%MANIFEST_FILE% & exit /b 1)'
+                    bat 'kubectl get namespace %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%" || kubectl create namespace %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret app-secrets -n %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret firebase-service-account -n %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
                     bat "kubectl apply -f k8s/dev/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %DEV_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %DEV_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
@@ -149,7 +153,15 @@ pipeline {
                 notifyWebhook('Deploy to Dev', 'SUCCESS')
             }
             post {
-                failure { notifyWebhook('Deploy to Dev', 'FAILURE') }
+                failure {
+                    notifyWebhook('Deploy to Dev', 'FAILURE')
+                    withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                        bat 'kubectl get pods -n %DEV_NAMESPACE% -o wide --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-platform -n %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-frontend -n %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl get events -n %DEV_NAMESPACE% --sort-by=.lastTimestamp --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                    }
+                }
             }
         }
 
@@ -163,7 +175,15 @@ pipeline {
                 notifyWebhook('Smoke Test', 'SUCCESS')
             }
             post {
-                failure { notifyWebhook('Smoke Test', 'FAILURE') }
+                failure {
+                    notifyWebhook('Smoke Test', 'FAILURE')
+                    withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                        bat 'kubectl get pods -n %DEV_NAMESPACE% -o wide --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-platform -n %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-frontend -n %DEV_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl get events -n %DEV_NAMESPACE% --sort-by=.lastTimestamp --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                    }
+                }
             }
         }
 
@@ -171,6 +191,10 @@ pipeline {
             steps {
                 notifyWebhook('Deploy to Staging', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                    bat 'if not exist k8s\\staging\\%MANIFEST_FILE% (echo [ERROR] Missing manifest: k8s/staging/%MANIFEST_FILE% & exit /b 1)'
+                    bat 'kubectl get namespace %STAGING_NAMESPACE% --kubeconfig="%KUBECONFIG%" || kubectl create namespace %STAGING_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret app-secrets -n %STAGING_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret firebase-service-account -n %STAGING_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
                     bat "kubectl apply -f k8s/staging/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %STAGING_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %STAGING_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
@@ -180,7 +204,15 @@ pipeline {
                 notifyWebhook('Deploy to Staging', 'SUCCESS')
             }
             post {
-                failure { notifyWebhook('Deploy to Staging', 'FAILURE') }
+                failure {
+                    notifyWebhook('Deploy to Staging', 'FAILURE')
+                    withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                        bat 'kubectl get pods -n %STAGING_NAMESPACE% -o wide --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-platform -n %STAGING_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-frontend -n %STAGING_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl get events -n %STAGING_NAMESPACE% --sort-by=.lastTimestamp --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                    }
+                }
             }
         }
 
@@ -196,6 +228,11 @@ pipeline {
             steps {
                 notifyWebhook('Deploy to Production', 'IN_PROGRESS')
                 withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                    bat 'if not exist k8s\\production\\%MANIFEST_FILE% (echo [ERROR] Missing manifest: k8s/production/%MANIFEST_FILE% & exit /b 1)'
+                    bat 'kubectl get namespace %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%" || kubectl create namespace %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret app-secrets -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret firebase-service-account -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
+                    bat 'kubectl get secret devops-platform-tls -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%"'
                     bat "kubectl apply -f k8s/production/%MANIFEST_FILE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-platform devops-platform=%DOCKER_IMAGE%:%BUILD_NUMBER% -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     bat "kubectl set image deployment/devops-frontend devops-frontend=%FRONTEND_IMAGE%:%BUILD_NUMBER% -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
@@ -208,6 +245,10 @@ pipeline {
                 failure {
                     notifyWebhook('Deploy to Production', 'FAILURE')
                     withCredentials([file(credentialsId: 'kubeconfig-credential', variable: 'KUBECONFIG')]) {
+                        bat 'kubectl get pods -n %PRODUCTION_NAMESPACE% -o wide --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-platform -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl describe deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
+                        bat 'kubectl get events -n %PRODUCTION_NAMESPACE% --sort-by=.lastTimestamp --kubeconfig="%KUBECONFIG%" || exit /b 0'
                         bat "kubectl rollout undo deployment/devops-platform -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                         bat "kubectl rollout undo deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     }

@@ -30,6 +30,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/auth/**",
+                    "/api/dashboard/**",
+                    "/api/metrics/**",
                     "/api/webhook/**",
                     "/actuator/health",
                     "/actuator/info",
@@ -37,7 +39,6 @@ public class SecurityConfig {
                     "/error"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/dashboard/**", "/api/metrics/**").authenticated()
                 .anyRequest().denyAll()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))

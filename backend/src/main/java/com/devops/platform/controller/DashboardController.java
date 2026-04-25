@@ -9,10 +9,13 @@ import com.devops.platform.service.PipelineService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -81,21 +84,42 @@ public class DashboardController {
 
     @GetMapping("/firebase-token")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFirebaseToken(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Authentication required"));
-        }
+        String principalName = resolvePrincipalName(authentication);
+        Collection<? extends GrantedAuthority> authorities = resolveAuthorities(authentication);
 
         return firebaseTokenService
-                .createDashboardToken(authentication.getName(), authentication.getAuthorities())
+                .createDashboardToken(principalName, authorities)
                 .<ResponseEntity<ApiResponse<Map<String, Object>>>>map(token -> ResponseEntity.ok(
                         ApiResponse.ok(Map.of(
                                 "token", token,
-                                "uid", authentication.getName(),
+                                "uid", principalName,
                                 "issuedAt", Instant.now().toEpochMilli()
                         ))
                 ))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                         .body(ApiResponse.error("Firebase realtime auth is not available")));
+    }
+
+    private String resolvePrincipalName(Authentication authentication) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return "guest-dashboard";
+        }
+
+        String principalName = authentication.getName();
+        if (principalName == null || principalName.isBlank()) {
+            return "guest-dashboard";
+        }
+        return principalName;
+    }
+
+    private Collection<? extends GrantedAuthority> resolveAuthorities(Authentication authentication) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return List.of();
+        }
+        return authentication.getAuthorities();
     }
 }
