@@ -92,7 +92,7 @@ class PipelineServiceTest {
             BuildEvent event = buildEvent("Build", "SUCCESS", 4);
             pipelineService.processWebhook(event);
 
-            verify(firestoreService).upsertBuildSummary(any(PipelineStatus.class), eq("abc123"), eq("webhook"));
+            verify(firestoreService).upsertBuildSummary(any(PipelineStatus.class), eq("abc123"), eq("webhook"), any());
             verify(firestoreService).appendBuildEvent(event);
         }
 
@@ -104,7 +104,7 @@ class PipelineServiceTest {
 
             verify(firestoreService).upsertBuildSummary(
                     argThat(status -> "FAILURE".equals(status.getOverallStatus())),
-                    anyString(), eq("webhook"));
+                    anyString(), eq("webhook"), any());
         }
 
         @Test
@@ -117,7 +117,7 @@ class PipelineServiceTest {
 
             verify(firestoreService, atLeastOnce()).upsertBuildSummary(
                     argThat(status -> "SUCCESS".equals(status.getOverallStatus())),
-                    anyString(), eq("webhook"));
+                    anyString(), eq("webhook"), any());
         }
 
         @Test
@@ -128,7 +128,7 @@ class PipelineServiceTest {
 
             verify(firestoreService).upsertBuildSummary(
                     argThat(status -> "IN_PROGRESS".equals(status.getOverallStatus())),
-                    anyString(), eq("webhook"));
+                    anyString(), eq("webhook"), any());
         }
 
         @Test
@@ -139,7 +139,7 @@ class PipelineServiceTest {
 
             verify(firestoreService).upsertBuildSummary(
                     argThat(status -> status.getJenkinsUrl() != null && status.getJenkinsUrl().contains("8")),
-                    anyString(), eq("webhook"));
+                    anyString(), eq("webhook"), any());
         }
 
         @Test
@@ -178,7 +178,7 @@ class PipelineServiceTest {
             verify(firestoreService).upsertBuildSummary(
                     argThat(status -> status.getStages().stream()
                             .anyMatch(s -> "Custom Security Scan".equals(s.getName()))),
-                    anyString(), eq("webhook"));
+                    anyString(), eq("webhook"), any());
         }
 
         @Test
@@ -189,7 +189,7 @@ class PipelineServiceTest {
 
             verify(firestoreService).upsertBuildSummary(
                     argThat(status -> "FAILURE".equals(status.getOverallStatus())),
-                    anyString(), eq("webhook"));
+                    anyString(), eq("webhook"), any());
         }
     }
 

@@ -117,6 +117,8 @@ class MetricsControllerIntegrationTest {
         @Test
         @DisplayName("GET /api/dashboard/test-results - should return test results summary")
         void shouldReturnTestResults() throws Exception {
+            when(pipelineService.getLatestTestResults()).thenReturn(Map.of("totalTests", 0, "passRate", 0.0));
+
             mockMvc.perform(get("/api/dashboard/test-results"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.totalTests").value(0))

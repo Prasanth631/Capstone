@@ -22,18 +22,19 @@ class DashboardSyncServiceTest {
     @Mock private Firestore firestore;
     @Mock private PipelineService pipelineService;
     @Mock private MetricsService metricsService;
+    @Mock private FirestoreService firestoreService;
 
     private DashboardSyncService dashboardSyncService;
 
     @BeforeEach
     void setUp() {
-        dashboardSyncService = new DashboardSyncService(firestore, pipelineService, metricsService);
+        dashboardSyncService = new DashboardSyncService(firestore, pipelineService, metricsService, firestoreService);
     }
 
     @Test
     @DisplayName("should skip sync when Firestore is null")
     void shouldSkipWhenFirestoreNull() {
-        DashboardSyncService nullService = new DashboardSyncService(null, pipelineService, metricsService);
+        DashboardSyncService nullService = new DashboardSyncService(null, pipelineService, metricsService, firestoreService);
         assertThatCode(nullService::syncDashboardData).doesNotThrowAnyException();
 
         // Should not call any downstream services when Firestore is null

@@ -2,7 +2,6 @@ package com.devops.platform.service;
 
 import com.devops.platform.dto.BuildEvent;
 import com.devops.platform.dto.PipelineStatus;
-import com.google.cloud.firestore.Firestore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

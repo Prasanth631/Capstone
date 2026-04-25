@@ -26,6 +26,7 @@ import java.util.Objects;
 
 @Service
 @Slf4j
+@SuppressWarnings("null")
 public class FirestoreService {
 
     @Nullable
