@@ -25,6 +25,11 @@ public class FirebaseConfig {
 
     @PostConstruct
     public void initialize() {
+        if (firebaseConfigPath == null || firebaseConfigPath.isBlank()) {
+            log.warn("Firebase initialization skipped - firebase.config-path is empty");
+            return;
+        }
+
         try {
             if (FirebaseApp.getApps().isEmpty()) {
                 InputStream serviceAccount;

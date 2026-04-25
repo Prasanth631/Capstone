@@ -3,7 +3,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-const serviceAccount = JSON.parse(readFileSync(resolve('backend/src/main/resources/firebase-service-account.json'), 'utf8'));
+const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_FILE || './secrets/firebase-service-account.json';
+const serviceAccount = JSON.parse(readFileSync(resolve(serviceAccountPath), 'utf8'));
 
 initializeApp({
   credential: cert(serviceAccount)

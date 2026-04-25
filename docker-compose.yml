@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
@@ -7,9 +5,13 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - SPRING_PROFILES_ACTIVE=dev
-      - JWT_SECRET=myDockerComposeSecretKeyThatIsAtLeast256BitsLongForDev2024!
-      - FIREBASE_CONFIG_PATH=firebase-service-account.json
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - FIREBASE_CONFIG_PATH=/run/secrets/firebase/firebase-service-account.json
+      - APP_CORS_ALLOWED_ORIGINS=${APP_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      - JENKINS_WEBHOOK_SECRET=${JENKINS_WEBHOOK_SECRET:-}
+    volumes:
+      - ${FIREBASE_SERVICE_ACCOUNT_FILE:-./secrets/firebase-service-account.json}:/run/secrets/firebase/firebase-service-account.json:ro
     networks:
       - devops-network
     restart: unless-stopped
@@ -46,8 +48,8 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
     volumes:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana

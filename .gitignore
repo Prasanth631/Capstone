@@ -23,6 +23,8 @@ Thumbs.db
 .env.local
 .env.*.local
 firebase-service-account.json
+**/firebase-service-account.json
+secrets/
 
 # ===== Node =====
 node_modules/

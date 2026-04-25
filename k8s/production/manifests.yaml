@@ -39,6 +39,22 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret
+            - name: JENKINS_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: jenkins-webhook-secret
+            - name: FIREBASE_CONFIG_PATH
+              value: /var/run/secrets/firebase/service-account.json
+            - name: APP_CORS_ALLOWED_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: APP_CORS_ALLOWED_ORIGINS
+          volumeMounts:
+            - name: firebase-service-account
+              mountPath: /var/run/secrets/firebase
+              readOnly: true
           resources:
             requests:
               cpu: "100m"
@@ -64,6 +80,10 @@ spec:
               port: 8082
             periodSeconds: 10
             failureThreshold: 3
+      volumes:
+        - name: firebase-service-account
+          secret:
+            secretName: firebase-service-account
 ---
 apiVersion: v1
 kind: Service
@@ -105,15 +125,7 @@ metadata:
   namespace: production
 data:
   SPRING_PROFILES_ACTIVE: "prod"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: app-secrets
-  namespace: production
-type: Opaque
-stringData:
-  jwt-secret: "productionSecretKeyThatIsAtLeast256BitsLongForHmacSHA256Algorithm2024!"
+  APP_CORS_ALLOWED_ORIGINS: "https://devops-platform.example.com"
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
