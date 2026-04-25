@@ -1,201 +1,137 @@
 # DevOps Intelligence Platform
 
-> Automated CI/CD Pipeline with Real-Time Monitoring Dashboard
+Production-focused CI/CD platform with secure Jenkins-to-backend webhooks, Firebase-backed realtime dashboard projections, and full-stack Kubernetes deployments.
 
-A production-grade deployment system that takes code commits to live deployment with near-zero downtime, featuring a Spring Boot backend, React dashboard, Jenkins pipeline, Docker/Kubernetes multi-environment deployment, and Prometheus/Grafana monitoring.
+## Core Stack
+- Backend: Spring Boot 3.4, Java 17, Spring Security, JWT
+- Frontend: React 18, Vite 6, Tailwind CSS
+- Realtime Data: Firestore listeners + backend webhook projection updates
+- CI/CD: Jenkins Declarative Pipeline (11 stages)
+- Containers: Docker multi-stage builds (backend + frontend)
+- Orchestration: Kubernetes (dev, staging, production) + Ingress + HPA
+- Monitoring: Prometheus + Grafana + Micrometer
 
----
+## Realtime Architecture
+1. Jenkins stage events call `POST /api/webhook/jenkins` with `X-Jenkins-Webhook-Token`.
+2. Backend validates signature and updates:
+   - canonical `builds/{doc}`
+   - ordered `builds/{doc}/events/{timestamp-sequence}`
+   - live `dashboardEvents/{timestamp-build-sequence}`
+   - merged `dashboard/overview` projection
+3. Frontend authenticates to backend (JWT), requests `/api/dashboard/firebase-token`, signs into Firebase with custom token, and subscribes to:
+   - `dashboard/overview`
+   - `builds` (history deltas)
+   - `dashboardEvents` (live stage stream)
+   - `deployments` (environment health)
 
-## Architecture
+## Security Changes
+- `/api/dashboard/**` requires JWT authentication.
+- `/api/admin/**` requires `ROLE_ADMIN`.
+- `/api/webhook/jenkins` rejects unsigned/invalid requests (401).
+- JWT secret has no insecure default fallback.
+- Kubernetes manifest secrets are externalized to `app-secrets` / `firebase-service-account`.
+- Firestore rules are auth-gated for dashboard/build/deployment collections.
 
+## API Summary
+- `POST /api/auth/register` public
+- `POST /api/auth/login` public
+- `GET /api/dashboard/firebase-token` JWT auth required
+- `GET /api/dashboard/builds` JWT auth required
+- `GET /api/dashboard/pipeline-status` JWT auth required
+- `GET /api/dashboard/build-analytics` JWT auth required
+- `GET /api/dashboard/metrics` JWT auth required
+- `GET /api/dashboard/test-results` JWT auth required
+- `GET /api/dashboard/docker-status` JWT auth required
+- `GET /api/dashboard/k8s-status` JWT auth required
+- `POST /api/webhook/jenkins` signed webhook required (`X-Jenkins-Webhook-Token`)
+
+## Local Development
+### 1) Environment
+```bash
+cp .env.example .env
 ```
-┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
-│  Developer   │───>│  GitHub/Git  │───>│     Jenkins      │
-│  Code Commit │    │   Webhook    │    │  11-Stage Pipeline│
-└─────────────┘    └──────────────┘    └────────┬────────┘
-                                                │
-                   ┌────────────────────────────┤
-                   │         Pipeline Stages     │
-                   ├─ Checkout                   │
-                   ├─ Build (Maven)              │
-                   ├─ Unit & Integration Tests   │
-                   ├─ Static Analysis (SonarQube)│
-                   ├─ API Tests (Newman)         │
-                   ├─ Docker Build & Push        │
-                   ├─ Deploy to Dev              │
-                   ├─ Smoke Test                 │
-                   ├─ Deploy to Staging          │
-                   ├─ Manual Approval            │
-                   └─ Deploy to Production       │
-                                                │
-       ┌────────────────────────────────────────┘
-       │
-       v
-┌──────────────┐    ┌───────────────┐    ┌──────────────┐
-│ Spring Boot  │───>│   Firebase    │<───│    React     │
-│   Backend    │    │   Firestore   │    │  Dashboard   │
-│  (JWT Auth)  │    │  (Real-time)  │    │ (Real-time)  │
-└──────┬───────┘    └───────────────┘    └──────────────┘
-       │
-       v
-┌──────────────┐    ┌───────────────┐
-│  Kubernetes  │    │  Prometheus + │
-│  3 Namespaces│    │    Grafana    │
-│ dev/stg/prod │    │  Monitoring   │
-└──────────────┘    └───────────────┘
-```
 
-## Tech Stack
-
-| Layer        | Technology                                     |
-|-------------|------------------------------------------------|
-| Backend      | Spring Boot 3.4, Java 17, Spring Security |
-| Auth         | JWT (JJWT), BCrypt                             |
-| Frontend     | React 18, Vite 6, Tailwind CSS, Recharts       |
-| Real-time DB | Firebase Firestore (onSnapshot listeners)      |
-| CI/CD        | Jenkins (Declarative Pipeline, 11 stages)      |
-| Containers   | Docker (multi-stage builds)                    |
-| Orchestration| Kubernetes (3 namespaces, HPA, Ingress)        |
-| Monitoring   | Prometheus + Grafana + Micrometer              |
-| Testing      | JUnit 5, MockMvc, Postman/Newman, Selenium     |
-| Code Quality | SonarQube, JaCoCo (≥80% coverage)              |
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Java 17 + Maven 3.9+
-- Node.js 20+
-- Docker & Docker Compose
-- (Optional) Minikube/Kind for K8s testing
-
-### 1. Clone & Backend
-
+### 2) Backend
 ```bash
 cd backend
-mvn clean install
+mvn -B test
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The backend starts at `http://localhost:8082`.
-
-### 2. Frontend
-
+### 3) Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-The dashboard opens at `http://localhost:5173`.
-
-### 3. Docker Compose (Full Stack)
-
+## Docker Compose
 ```bash
-docker-compose up -d
+docker compose up -d --build
+docker compose ps
 ```
 
 Services:
-- **Backend**: http://localhost:8082
-- **Frontend**: http://localhost:3000
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3001 (admin/admin)
+- Backend: `http://localhost:8082`
+- Frontend: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001`
 
----
+## Jenkins Requirements
+Configure these Jenkins credentials:
+- `dockerhub-credentials` (username/password)
+- `kubeconfig-credential` (secret file)
+- `jenkins-webhook-secret` (secret text)
 
-## Project Structure
-
-```
-Capstone/
-├── backend/          → Spring Boot API (JWT, Firebase, Actuator)
-├── frontend/         → React Dashboard (Vite, Tailwind, Recharts)
-├── jenkins/          → Jenkinsfile (11-stage pipeline)
-├── k8s/              → Kubernetes manifests (dev/staging/production)
-├── monitoring/       → Prometheus config + Grafana dashboards
-├── postman/          → API test collection + environments
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-## API Endpoints
-
-| Method | Endpoint                        | Auth   | Description                     |
-|--------|---------------------------------|--------|---------------------------------|
-| POST   | `/api/auth/register`            | Public | Register new user, returns JWT  |
-| POST   | `/api/auth/login`               | Public | Login, returns JWT              |
-| GET    | `/api/dashboard/builds`         | JWT    | Paged build history (`limit`, `cursor`) |
-| GET    | `/api/dashboard/pipeline-status`| JWT    | Active pipeline status          |
-| GET    | `/api/dashboard/metrics`        | JWT    | System metrics (CPU/RAM/JVM)    |
-| GET    | `/api/dashboard/test-results`   | JWT    | Test results summary            |
-| GET    | `/api/dashboard/docker-status`  | JWT    | Docker container info           |
-| GET    | `/api/dashboard/k8s-status`     | JWT    | Kubernetes cluster state        |
-| GET    | `/api/dashboard/build-analytics`| JWT    | Build analytics summary         |
-| POST   | `/api/webhook/jenkins`          | Public | Jenkins stage webhook receiver  |
-| POST   | `/api/admin/backfill/jenkins`   | JWT    | Trigger Jenkins historical backfill |
-| GET    | `/actuator/health`              | Public | Health check                    |
-| GET    | `/actuator/prometheus`          | Public | Prometheus metrics              |
-
----
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in your values:
-
-| Variable             | Description                       |
-|---------------------|-----------------------------------|
-| `JWT_SECRET`         | 256-bit secret for JWT signing    |
-| `FIREBASE_CONFIG_PATH` | Path to Firebase service account JSON |
-| `JENKINS_BASE_URL`   | Jenkins base URL used for backfill |
-| `JENKINS_USERNAME`   | Jenkins API username               |
-| `JENKINS_API_TOKEN`  | Jenkins API token/password         |
-| `JENKINS_BACKFILL_DEFAULT_PER_JOB_LIMIT` | Max builds imported per job (default `500`) |
-| `DOCKER_USERNAME`    | Docker Hub username               |
-| `DOCKER_PASSWORD`    | Docker Hub password/token         |
-
----
-
-## Testing
-
-```bash
-# Unit + Integration tests
-cd backend && mvn test
-
-# Coverage report
-mvn verify
-open target/site/jacoco/index.html
-
-# API tests (Newman)
-npx newman run postman/DevOps-Platform.postman_collection.json \
-  -e postman/environments/dev.postman_environment.json
-```
-
----
+Jenkins parameters support environment-specific overrides for image names, namespaces, webhook URL, and manifest filename.
 
 ## Kubernetes Deployment
-
+Apply one manifest per environment:
 ```bash
-# Dev
-kubectl apply -f k8s/dev/
-
-# Staging
-kubectl apply -f k8s/staging/
-
-# Production (includes HPA: 2-10 pods at 60% CPU)
-kubectl apply -f k8s/production/
+kubectl apply -f k8s/dev/manifests.yaml
+kubectl apply -f k8s/staging/manifests.yaml
+kubectl apply -f k8s/production/manifests.yaml
 ```
 
----
+### Required Kubernetes Secrets
+Create these before deployment:
+```bash
+kubectl create secret generic app-secrets \
+  --from-literal=jwt-secret='<jwt-secret>' \
+  --from-literal=jenkins-webhook-secret='<webhook-secret>' \
+  -n <namespace>
 
-## Credentials Needed
+kubectl create secret generic firebase-service-account \
+  --from-file=service-account.json='<path-to-firebase-service-account.json>' \
+  -n <namespace>
+```
 
-| Item                        | How to Get It                                    |
-|-----------------------------|--------------------------------------------------|
-| Firebase Service Account    | Firebase Console → Project Settings → Service Accounts → Generate Key |
-| Docker Hub Credentials      | hub.docker.com → Account Settings                |
-| GitHub Personal Access Token| GitHub → Settings → Developer Settings → Tokens  |
-| SonarQube Token             | SonarQube → My Account → Security → Generate     |
-| Jenkins Admin Password      | Set during Jenkins setup                         |
+Production ingress expects TLS secret:
+```bash
+kubectl create secret tls devops-platform-tls \
+  --cert=<tls-cert-file> \
+  --key=<tls-key-file> \
+  -n production
+```
+
+## Verification Commands
+```bash
+# Backend
+cd backend && mvn -B test
+
+# Frontend
+cd frontend && npm run build
+
+# Compose render check
+docker compose config
+
+# Kubernetes validation
+kubectl apply --dry-run=client -f k8s/dev/manifests.yaml
+kubectl apply --dry-run=client -f k8s/staging/manifests.yaml
+kubectl apply --dry-run=client -f k8s/production/manifests.yaml
+```
+
+## Notes
+- Realtime pipeline progression is event-driven from Jenkins webhooks; scheduler refresh is reserved for infra metrics.
+- If Firebase service account is missing, backend Firestore writes are no-op and `/api/dashboard/firebase-token` returns 503.
+- Ops procedures are documented in `docs/operations-runbook.md`.
