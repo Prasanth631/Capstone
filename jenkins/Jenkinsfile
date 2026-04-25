@@ -241,8 +241,8 @@ pipeline {
                         bat 'kubectl describe deployment/devops-platform -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
                         bat 'kubectl describe deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --kubeconfig="%KUBECONFIG%" || exit /b 0'
                         bat 'kubectl get events -n %PRODUCTION_NAMESPACE% --sort-by=.lastTimestamp --kubeconfig="%KUBECONFIG%" || exit /b 0'
-                        bat "kubectl rollout undo deployment/devops-platform -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\"" || bat "exit /b 0"
-                        bat "kubectl rollout undo deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\"" || bat "exit /b 0"
+                        bat returnStatus: true, script: "kubectl rollout undo deployment/devops-platform -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
+                        bat returnStatus: true, script: "kubectl rollout undo deployment/devops-frontend -n %PRODUCTION_NAMESPACE% --kubeconfig=\"%KUBECONFIG%\""
                     }
                 }
             }
