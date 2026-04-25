@@ -44,9 +44,15 @@ public class PipelineWebhookController {
 
     private boolean isWebhookAuthorized(String webhookToken) {
         String configuredSecret = jenkinsProperties.getWebhookSecret();
+
+        // Dev mode: no secret configured on the backend → accept any webhook
         if (configuredSecret == null || configuredSecret.isBlank()) {
-            return false;
+            log.warn("Accepting webhook without auth - JENKINS_WEBHOOK_SECRET is not configured. "
+                    + "Set jenkins.webhook-secret for production use.");
+            return true;
         }
+
+        // Secret configured but no token provided by caller
         if (webhookToken == null || webhookToken.isBlank()) {
             return false;
         }

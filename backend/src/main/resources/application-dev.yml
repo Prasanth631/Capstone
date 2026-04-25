@@ -5,3 +5,14 @@ jwt:
   # Local-dev fallback; production/staging should still provide JWT_SECRET via environment.
   secret: ${JWT_SECRET:dev-local-jwt-secret-change-this-before-sharing-1234567890}
   expiration: 86400000
+
+# Firebase - point to the local secrets file for dev mode
+firebase:
+  config-path: ${FIREBASE_CONFIG_PATH:../secrets/firebase-service-account.json}
+
+# Jenkins - dev-mode webhook secret (must match Jenkins credential "jenkins-webhook-secret")
+jenkins:
+  webhook-secret: ${JENKINS_WEBHOOK_SECRET:devops-webhook-secret-2024}
+  base-url: ${JENKINS_BASE_URL:http://localhost:8080}
+  username: ${JENKINS_USERNAME:}
+  api-token: ${JENKINS_API_TOKEN:}
