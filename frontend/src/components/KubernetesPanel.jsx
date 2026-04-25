@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Server, Box, Scaling } from 'lucide-react'
 
 export default function KubernetesPanel({ status }) {
   const [activeNs, setActiveNs] = useState('')
 
   const namespaces = status?.namespaces || []
-  
-  // Initialize active namespace if not set and namespaces exist
-  if (!activeNs && namespaces.length > 0) {
-     setActiveNs(namespaces[0].namespace)
-  }
+
+  useEffect(() => {
+    if (!activeNs && namespaces.length > 0) {
+      setActiveNs(namespaces[0].namespace)
+    }
+  }, [activeNs, namespaces])
 
   const active = namespaces.find(n => n.namespace === (activeNs || (namespaces.length > 0 ? namespaces[0].namespace : '')))
 

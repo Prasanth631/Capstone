@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { LogOut, Cpu, Sun, Moon, Github, ExternalLink, LayoutDashboard, ReceiptText, Activity } from 'lucide-react'
 
 const GITHUB_REPO = 'https://github.com/Prasanth631/Capstone'
-const JENKINS_URL = 'http://localhost:8080'
+const JENKINS_URL = import.meta.env.VITE_JENKINS_BASE_URL || 'http://localhost:8080'
 
 function LiveIndicator({ lastRefresh }) {
   const [ago, setAgo] = useState('')

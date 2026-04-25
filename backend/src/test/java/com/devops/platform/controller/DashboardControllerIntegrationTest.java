@@ -3,7 +3,9 @@ package com.devops.platform.controller;
 import com.devops.platform.dto.RegisterRequest;
 import com.devops.platform.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,8 +14,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -21,9 +25,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Dashboard Controller Integration Tests")
 class DashboardControllerIntegrationTest {
 
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private UserRepository userRepository;
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private UserRepository userRepository;
 
     private String authToken;
 
@@ -31,7 +38,6 @@ class DashboardControllerIntegrationTest {
     void setUp() throws Exception {
         userRepository.deleteAll();
 
-        // Register and get token
         RegisterRequest regRequest = new RegisterRequest("dashtest", "dashtest@test.com", "password123");
         MvcResult result = mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -44,7 +50,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/builds — returns build list")
+    @DisplayName("GET /api/dashboard/builds returns build list")
     void testGetBuilds() throws Exception {
         mockMvc.perform(get("/api/dashboard/builds")
                         .header("Authorization", "Bearer " + authToken))
@@ -54,7 +60,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/pipeline-status — returns pipeline list")
+    @DisplayName("GET /api/dashboard/pipeline-status returns pipeline list")
     void testGetPipelineStatus() throws Exception {
         mockMvc.perform(get("/api/dashboard/pipeline-status")
                         .header("Authorization", "Bearer " + authToken))
@@ -63,7 +69,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/metrics — returns system metrics")
+    @DisplayName("GET /api/dashboard/metrics returns system metrics")
     void testGetMetrics() throws Exception {
         mockMvc.perform(get("/api/dashboard/metrics")
                         .header("Authorization", "Bearer " + authToken))
@@ -75,7 +81,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/docker-status — returns Docker info")
+    @DisplayName("GET /api/dashboard/docker-status returns Docker info")
     void testGetDockerStatus() throws Exception {
         mockMvc.perform(get("/api/dashboard/docker-status")
                         .header("Authorization", "Bearer " + authToken))
@@ -85,7 +91,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/k8s-status — returns Kubernetes info")
+    @DisplayName("GET /api/dashboard/k8s-status returns Kubernetes info")
     void testGetKubernetesStatus() throws Exception {
         mockMvc.perform(get("/api/dashboard/k8s-status")
                         .header("Authorization", "Bearer " + authToken))
@@ -95,7 +101,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/build-analytics — returns analytics")
+    @DisplayName("GET /api/dashboard/build-analytics returns analytics")
     void testGetBuildAnalytics() throws Exception {
         mockMvc.perform(get("/api/dashboard/build-analytics")
                         .header("Authorization", "Bearer " + authToken))
@@ -106,7 +112,7 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/dashboard/test-results — returns test summary")
+    @DisplayName("GET /api/dashboard/test-results returns test summary")
     void testGetTestResults() throws Exception {
         mockMvc.perform(get("/api/dashboard/test-results")
                         .header("Authorization", "Bearer " + authToken))
@@ -116,7 +122,16 @@ class DashboardControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/webhook/jenkins — accepts build event (public endpoint)")
+    @DisplayName("GET /api/dashboard/firebase-token returns 503 when Firebase is unavailable")
+    void testGetFirebaseTokenWhenFirebaseUnavailable() throws Exception {
+        mockMvc.perform(get("/api/dashboard/firebase-token")
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("POST /api/webhook/jenkins accepts build event")
     void testJenkinsWebhook() throws Exception {
         String webhookPayload = """
                 {

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { History, Search, GitBranch, Clock, ExternalLink, GitCommit } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
+const JENKINS_BASE_URL = import.meta.env.VITE_JENKINS_BASE_URL || 'http://localhost:8080'
+
 export default function BuildHistoryTable({ builds, loading, hasMore, loadingMore, onLoadMore }) {
   const [search, setSearch] = useState('')
 
@@ -44,7 +46,8 @@ export default function BuildHistoryTable({ builds, loading, hasMore, loadingMor
     if (build.jenkinsUrl) return build.jenkinsUrl
     // Fallback: construct from job name and build number
     if (build.jobName && build.buildNumber) {
-      return `http://localhost:8080/job/${build.jobName.replace(/\//g, '/job/')}/${build.buildNumber}/`
+      const normalizedBase = JENKINS_BASE_URL.replace(/\/+$/, '')
+      return `${normalizedBase}/job/${build.jobName.replace(/\//g, '/job/')}/${build.buildNumber}/`
     }
     return null
   }
@@ -94,7 +97,7 @@ export default function BuildHistoryTable({ builds, loading, hasMore, loadingMor
               const commitLink = getCommitUrl(build)
               return (
                 <tr
-                  key={`${build.jobName}-${build.buildNumber}-${build.startTime}`}
+                  key={build._docId || `${build.jobName}-${build.buildNumber}-${build.startTime}`}
                   className="border-b border-surface-100 dark:border-white/5 hover:bg-surface-50 dark:hover:bg-white/[0.03] transition-colors group"
                 >
                   <td className="py-3.5 pr-4 pl-1 font-mono font-medium">

@@ -105,6 +105,8 @@ public class FirestoreService {
             feedEvent.put("gitBranch", event.getGitBranch());
             feedEvent.put("gitCommit", event.getGitCommit());
             feedEvent.put("triggerType", event.getTriggerType());
+            feedEvent.put("jenkinsUrl", status.getJenkinsUrl());
+            feedEvent.put("githubUrl", status.getGithubUrl());
             feedEvent.put("eventTimestamp", eventTimestamp);
             feedEvent.put("eventSequence", eventSequence);
             feedEvent.put("source", "jenkins-webhook");

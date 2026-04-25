@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { signOut } from 'firebase/auth'
 import api from '../api/axios'
+import { firebaseAuth } from '../firebase'
 
 const AuthContext = createContext(null)
 
@@ -58,6 +59,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user')
     setToken(null)
     setUser(null)
+    signOut(firebaseAuth).catch(() => {})
   }, [])
 
   return (
