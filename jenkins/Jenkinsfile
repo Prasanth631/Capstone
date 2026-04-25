@@ -216,13 +216,6 @@ pipeline {
             }
         }
 
-        stage('Manual Approval') {
-            steps {
-                notifyWebhook('Manual Approval', 'IN_PROGRESS')
-                input message: 'Deploy to Production?', ok: 'Approve'
-                notifyWebhook('Manual Approval', 'SUCCESS')
-            }
-        }
 
         stage('Deploy to Production') {
             steps {
