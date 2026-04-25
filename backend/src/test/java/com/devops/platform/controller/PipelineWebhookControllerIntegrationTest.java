@@ -45,6 +45,7 @@ class PipelineWebhookControllerIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/webhook/jenkins")
+                        .header("X-Jenkins-Webhook-Token", "test-webhook-secret")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(event)))
                 .andExpect(status().isOk())
@@ -67,6 +68,7 @@ class PipelineWebhookControllerIntegrationTest {
                 """;
 
         mockMvc.perform(post("/api/webhook/jenkins")
+                        .header("X-Jenkins-Webhook-Token", "test-webhook-secret")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isOk())
@@ -86,9 +88,28 @@ class PipelineWebhookControllerIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/webhook/jenkins")
+                        .header("X-Jenkins-Webhook-Token", "test-webhook-secret")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(event)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value("Build #99"));
+    }
+
+    @Test
+    @DisplayName("POST /api/webhook/jenkins - should reject unsigned requests")
+    void shouldRejectUnsignedBuildEvent() throws Exception {
+        BuildEvent event = BuildEvent.builder()
+                .buildNumber(100)
+                .jobName("unsigned-job")
+                .stage("Build")
+                .status("SUCCESS")
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        mockMvc.perform(post("/api/webhook/jenkins")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(event)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
     }
 }

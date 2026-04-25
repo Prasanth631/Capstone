@@ -11,6 +11,7 @@ public class JenkinsProperties {
     private String baseUrl;
     private String username;
     private String apiToken;
+    private String webhookSecret;
     private Backfill backfill = new Backfill();
 
     @Data

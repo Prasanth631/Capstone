@@ -39,13 +39,14 @@ management:
 # CORS
 app:
   cors:
-    allowed-origins: http://localhost:5173,http://localhost:3000
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
 
 # Jenkins integration
 jenkins:
   base-url: ${JENKINS_BASE_URL:}
   username: ${JENKINS_USERNAME:}
   api-token: ${JENKINS_API_TOKEN:}
+  webhook-secret: ${JENKINS_WEBHOOK_SECRET:}
   backfill:
     startup-enabled: ${JENKINS_BACKFILL_STARTUP_ENABLED:true}
     default-per-job-limit: ${JENKINS_BACKFILL_DEFAULT_PER_JOB_LIMIT:500}

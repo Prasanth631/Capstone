@@ -1,5 +1,5 @@
 # ===== Stage 1: Build =====
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+FROM maven:3.9.11-eclipse-temurin-17 AS build
 WORKDIR /app
 
 # Cache dependencies
@@ -11,22 +11,22 @@ COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 # ===== Stage 2: Runtime =====
-FROM eclipse-temurin:17-jre-alpine AS runtime
+FROM eclipse-temurin:17-jre-jammy AS runtime
 WORKDIR /app
 
 # Create non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin appuser
 
 # Copy JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
 # Set ownership
-RUN chown -R appuser:appgroup /app
+RUN chown -R appuser:appuser /app
 
 USER appuser
 
 # JVM tuning for containers
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dio.netty.handler.ssl.noOpenSsl=true"
 
 EXPOSE 8082
 

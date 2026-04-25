@@ -31,12 +31,14 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/auth/**",
                     "/api/webhook/**",
-                    "/actuator/**",
-                    "/h2-console/**",
-                    "/error",
-                    "/api/**" // allow all api routes for dashboard
+                    "/actuator/health",
+                    "/actuator/info",
+                    "/actuator/prometheus",
+                    "/error"
                 ).permitAll()
-                .anyRequest().permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/dashboard/**", "/api/metrics/**").authenticated()
+                .anyRequest().denyAll()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

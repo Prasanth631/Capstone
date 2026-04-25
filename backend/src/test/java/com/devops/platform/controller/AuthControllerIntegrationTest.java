@@ -115,7 +115,7 @@ class AuthControllerIntegrationTest {
     @DisplayName("GET /api/dashboard/builds — 200 without JWT (Public Access)")
     void testDashboardWithoutAuth() throws Exception {
         mockMvc.perform(get("/api/dashboard/builds"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     @Test

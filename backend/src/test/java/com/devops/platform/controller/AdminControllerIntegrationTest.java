@@ -2,11 +2,7 @@ package com.devops.platform.controller;
 
 import com.devops.platform.dto.JenkinsBackfillRequest;
 import com.devops.platform.dto.JenkinsBackfillResponse;
-import com.devops.platform.dto.RegisterRequest;
-import com.devops.platform.repository.UserRepository;
 import com.devops.platform.service.JenkinsBackfillService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -17,11 +13,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,41 +29,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminControllerIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private UserRepository userRepository;
-
     @MockitoBean private JenkinsBackfillService jenkinsBackfillService;
 
-    private String authToken;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        userRepository.deleteAll();
-
-        RegisterRequest registerRequest = new RegisterRequest("adminuser", "admin@test.com", "password123");
-        MvcResult result = mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(registerRequest)))
-                .andExpect(status().isCreated())
-                .andReturn();
-
-        authToken = objectMapper.readTree(result.getResponse().getContentAsString())
-                .get("data")
-                .get("token")
-                .asText();
-    }
-
     @Test
-    @DisplayName("POST /api/admin/backfill/jenkins - does not require authentication anymore")
-    void testTriggerBackfillWorksWithoutAuth() throws Exception {
+    @DisplayName("POST /api/admin/backfill/jenkins - requires admin role")
+    void testTriggerBackfillRequiresAdminRole() throws Exception {
         mockMvc.perform(post("/api/admin/backfill/jenkins")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("POST /api/admin/backfill/jenkins - returns success payload for authenticated user")
+    @DisplayName("POST /api/admin/backfill/jenkins - returns success payload for admin user")
     void testTriggerBackfillSuccess() throws Exception {
         when(jenkinsBackfillService.runBackfill(any())).thenReturn(
                 JenkinsBackfillResponse.builder()
@@ -87,7 +61,7 @@ class AdminControllerIntegrationTest {
                 """;
 
         mockMvc.perform(post("/api/admin/backfill/jenkins")
-                        .header("Authorization", "Bearer " + authToken)
+                        .with(user("admin-user").roles("ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
@@ -115,7 +89,7 @@ class AdminControllerIntegrationTest {
         );
 
         mockMvc.perform(post("/api/admin/backfill/jenkins")
-                        .header("Authorization", "Bearer " + authToken)
+                        .with(user("admin-user").roles("ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())

@@ -133,6 +133,7 @@ class DashboardControllerIntegrationTest {
                 """;
 
         mockMvc.perform(post("/api/webhook/jenkins")
+                        .header("X-Jenkins-Webhook-Token", "test-webhook-secret")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(webhookPayload))
                 .andExpect(status().isOk())
