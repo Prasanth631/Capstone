@@ -52,17 +52,8 @@ public class DashboardController {
 
     @GetMapping("/test-results")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getTestResults() {
-        // Real test results are pushed via webhook events and read via Firestore onSnapshot
-        // This endpoint returns aggregate zeros — the frontend gets live data from Firestore
-        Map<String, Object> summary = Map.of(
-            "totalTests", 0,
-            "passed", 0,
-            "failed", 0,
-            "skipped", 0,
-            "passRate", 0.0,
-            "lastRunTimestamp", 0
-        );
-        return ResponseEntity.ok(ApiResponse.ok(summary));
+        return ResponseEntity.ok(
+                ApiResponse.ok(pipelineService.getLatestTestResults()));
     }
 
     @GetMapping("/docker-status")

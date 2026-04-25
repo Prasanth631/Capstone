@@ -20,6 +20,7 @@ public class DashboardSyncService {
     private final Firestore firestore;
     private final PipelineService pipelineService;
     private final MetricsService metricsService;
+    private final FirestoreService firestoreService;
 
     // Run every 5 seconds
     @Scheduled(fixedRate = 5000)
@@ -45,14 +46,8 @@ public class DashboardSyncService {
             dashboardData.put("dockerStatus", metricsService.getDockerStatus());
             dashboardData.put("k8sStatus", metricsService.getKubernetesStatus());
 
-            // 4. Test Results Summary (Authentic real-time via webhook)
-            Map<String, Object> testData = new HashMap<>();
-            testData.put("totalTests", 0);
-            testData.put("passed", 0);
-            testData.put("failed", 0);
-            testData.put("skipped", 0);
-            testData.put("passRate", 0.0);
-            dashboardData.put("testResults", testData);
+            // 4. Test Results Summary — real data from most recent build with test results
+            dashboardData.put("testResults", firestoreService.getLatestTestResults());
 
             dashboardData.put("lastUpdated", Instant.now().toEpochMilli());
 

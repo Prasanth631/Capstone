@@ -21,7 +21,7 @@ export default function LoginPage() {
     } else {
       success = await login(username, password)
     }
-    if (success) navigate('/expense-tracker')
+    if (success) navigate('/dashboard')
   }
 
   return (
@@ -49,10 +49,10 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 mb-4 shadow-lg shadow-indigo-500/25">
-             <span className="text-white font-bold text-2xl tracking-tighter">EF</span>
+             <Cpu className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold gradient-text">ExpenseFlow</h1>
-          <p className="text-surface-400 dark:text-surface-200/60 mt-2 text-sm">Smart financial tracking for modern teams</p>
+          <h1 className="text-3xl font-bold gradient-text">DevOps Intelligence</h1>
+          <p className="text-surface-400 dark:text-surface-200/60 mt-2 text-sm">Real-Time CI/CD Monitoring Platform</p>
         </div>
 
         {/* Login Card */}

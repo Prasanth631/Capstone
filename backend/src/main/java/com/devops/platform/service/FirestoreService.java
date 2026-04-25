@@ -82,6 +82,11 @@ public class FirestoreService {
     }
 
     public void upsertBuildSummary(PipelineStatus summary, @Nullable String gitCommit, String source) {
+        upsertBuildSummary(summary, gitCommit, source, null);
+    }
+
+    public void upsertBuildSummary(PipelineStatus summary, @Nullable String gitCommit, String source,
+                                   @Nullable Map<String, Object> testResults) {
         if (firestore == null) return;
 
         try {
@@ -111,6 +116,9 @@ public class FirestoreService {
             }
             if (summary.getGithubUrl() != null && !summary.getGithubUrl().isBlank()) {
                 data.put("githubUrl", summary.getGithubUrl());
+            }
+            if (testResults != null && !testResults.isEmpty()) {
+                data.put("testResults", testResults);
             }
             data.put("source", source);
             data.put("lastUpdated", Instant.now().toEpochMilli());
@@ -335,6 +343,46 @@ public class FirestoreService {
         } catch (Exception e) {
             log.error("Failed to fetch dashboard overview", e);
             return null;
+        }
+    }
+
+    /**
+     * Query the most recent build that has non-empty testResults and return them.
+     * Falls back to zero-values if no test data is found.
+     */
+    public Map<String, Object> getLatestTestResults() {
+        Map<String, Object> empty = new HashMap<>();
+        empty.put("totalTests", 0);
+        empty.put("passed", 0);
+        empty.put("failed", 0);
+        empty.put("skipped", 0);
+        empty.put("passRate", 0.0);
+
+        if (firestore == null) return empty;
+
+        try {
+            // Query recent builds that have testResults field
+            QuerySnapshot snapshot = firestore.collection("builds")
+                    .orderBy("startTime", Query.Direction.DESCENDING)
+                    .limit(20)
+                    .get()
+                    .get();
+
+            for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                Object testResultsObj = doc.get("testResults");
+                if (testResultsObj instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> tr = (Map<String, Object>) testResultsObj;
+                    Number total = (Number) tr.get("totalTests");
+                    if (total != null && total.intValue() > 0) {
+                        return tr;
+                    }
+                }
+            }
+            return empty;
+        } catch (Exception e) {
+            log.error("Failed to fetch latest test results from Firestore", e);
+            return empty;
         }
     }
 

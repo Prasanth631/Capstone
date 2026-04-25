@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { Link, useLocation } from 'react-router-dom'
@@ -5,6 +6,34 @@ import { LogOut, Cpu, Sun, Moon, Github, ExternalLink, LayoutDashboard, ReceiptT
 
 const GITHUB_REPO = 'https://github.com/Prasanth631/Capstone'
 const JENKINS_URL = 'http://localhost:8080'
+
+function LiveIndicator({ lastRefresh }) {
+  const [ago, setAgo] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      if (!lastRefresh) return
+      const diff = Math.floor((Date.now() - lastRefresh.getTime()) / 1000)
+      if (diff < 5) setAgo('just now')
+      else if (diff < 60) setAgo(`${diff}s ago`)
+      else setAgo(`${Math.floor(diff / 60)}m ago`)
+    }
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [lastRefresh])
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      </span>
+      <span className="text-emerald-600 dark:text-emerald-400 font-medium">Live</span>
+      <span className="text-muted">· {ago}</span>
+    </div>
+  )
+}
 
 export default function Navbar({ lastRefresh }) {
   const { user, logout } = useAuth()
@@ -21,18 +50,14 @@ export default function Navbar({ lastRefresh }) {
             </div>
             <div className="hidden sm:block">
               <h1 className="text-base font-bold text-heading">DevOps Intelligence</h1>
-              <p className="text-[11px] text-muted">SaaS Dashboard Framework</p>
+              <p className="text-[11px] text-muted">Real-Time CI/CD Dashboard</p>
             </div>
           </div>
 
           <div className="hidden md:flex items-center gap-4">
             {lastRefresh && (
               <>
-                <div className="flex items-center gap-2 text-xs">
-                  <Activity className="w-3 h-3 text-emerald-500 animate-pulse" />
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">Live</span>
-                  <span className="text-muted">· {lastRefresh.toLocaleTimeString()}</span>
-                </div>
+                <LiveIndicator lastRefresh={lastRefresh} />
                 <div className="h-4 w-px bg-surface-200 dark:bg-white/10" />
               </>
             )}

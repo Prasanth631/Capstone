@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { History, Search, GitBranch, Clock, ExternalLink, GitCommit } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
 
 export default function BuildHistoryTable({ builds, loading, hasMore, loadingMore, onLoadMore }) {
   const [search, setSearch] = useState('')
@@ -19,6 +20,16 @@ export default function BuildHistoryTable({ builds, loading, hasMore, loadingMor
 
   const formatTime = (ts) => {
     if (!ts) return '-'
+    try {
+      const date = new Date(ts)
+      return formatDistanceToNow(date, { addSuffix: true })
+    } catch {
+      return new Date(ts).toLocaleString()
+    }
+  }
+
+  const formatTimeFull = (ts) => {
+    if (!ts) return ''
     return new Date(ts).toLocaleString()
   }
 
@@ -126,7 +137,8 @@ export default function BuildHistoryTable({ builds, loading, hasMore, loadingMor
                       {formatDuration(build.totalDuration)}
                     </span>
                   </td>
-                  <td className="py-3 text-surface-400 dark:text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
+                  <td className="py-3 text-surface-400 dark:text-slate-400 text-[11px] uppercase tracking-wider font-semibold"
+                      title={formatTimeFull(build.startTime)}>
                     {formatTime(build.startTime)}
                   </td>
                 </tr>

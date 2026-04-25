@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar'
-import { Activity } from 'lucide-react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
 import api from '../api/axios'
@@ -12,8 +11,52 @@ import KubernetesPanel from '../components/KubernetesPanel'
 import SystemMetricsPanel from '../components/SystemMetricsPanel'
 import BuildAnalytics from '../components/BuildAnalytics'
 
-const GITHUB_REPO = 'https://github.com/Prasanth631/Capstone'
-const JENKINS_URL = 'http://localhost:8080'
+function SkeletonCard({ className = '' }) {
+  return (
+    <div className={`glass-card p-6 animate-pulse ${className}`}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-8 h-8 bg-surface-200 dark:bg-white/10 rounded-lg" />
+        <div className="h-4 w-32 bg-surface-200 dark:bg-white/10 rounded" />
+      </div>
+      <div className="space-y-3">
+        <div className="h-3 w-full bg-surface-200 dark:bg-white/10 rounded" />
+        <div className="h-3 w-3/4 bg-surface-200 dark:bg-white/10 rounded" />
+        <div className="h-3 w-1/2 bg-surface-200 dark:bg-white/10 rounded" />
+      </div>
+    </div>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards skeleton */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="glass-card p-5 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="h-3 w-16 bg-surface-200 dark:bg-white/10 rounded" />
+              <div className="w-8 h-8 bg-surface-200 dark:bg-white/10 rounded-lg" />
+            </div>
+            <div className="h-7 w-20 bg-surface-200 dark:bg-white/10 rounded" />
+          </div>
+        ))}
+      </div>
+      {/* Pipeline skeleton */}
+      <SkeletonCard className="h-32" />
+      {/* Metrics row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SkeletonCard className="min-h-[220px]" />
+        <SkeletonCard className="min-h-[220px]" />
+      </div>
+      {/* Docker + K8s row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SkeletonCard className="h-[300px]" />
+        <SkeletonCard className="h-[300px]" />
+      </div>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const pageSize = 40
@@ -32,6 +75,7 @@ export default function DashboardPage() {
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [connectionStatus, setConnectionStatus] = useState('connecting')
 
   const fetchBuildPage = async (cursor = null, append = false) => {
     if (append) {
@@ -69,6 +113,7 @@ export default function DashboardPage() {
   useEffect(() => { fetchBuildPage(null, false) }, [])
 
   useEffect(() => {
+    setConnectionStatus('connecting')
     const unsub = onSnapshot(doc(db, 'dashboard', 'overview'), (docSnap) => {
       if (docSnap.exists()) {
         const payload = docSnap.data()
@@ -81,12 +126,15 @@ export default function DashboardPage() {
           buildAnalytics: payload.buildAnalytics || {},
         })
         setLastRefresh(new Date(payload.lastUpdated || Date.now()))
+        setConnectionStatus('connected')
         setLoading(false)
       } else {
+        setConnectionStatus('no-data')
         setLoading(false)
       }
     }, (error) => {
       console.error("Firebase real-time stream error:", error)
+      setConnectionStatus('error')
       setLoading(false)
     })
     return () => unsub()
@@ -100,9 +148,7 @@ export default function DashboardPage() {
       {/* ─── Dashboard Content ─── */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {loading ? (
-          <div className="flex items-center justify-center h-96">
-            <div className="w-12 h-12 border-4 border-primary-200 dark:border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
-          </div>
+          <DashboardSkeleton />
         ) : (
           <>
             {/* Row 1: Build Analytics KPI Cards */}

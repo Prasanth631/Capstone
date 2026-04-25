@@ -1,4 +1,16 @@
+import { useState, useEffect } from 'react'
 import { GitBranch, Play, ExternalLink } from 'lucide-react'
+
+function ElapsedTimer() {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const interval = setInterval(() => setElapsed(e => e + 1), 1000)
+    return () => clearInterval(interval)
+  }, [])
+  const m = Math.floor(elapsed / 60)
+  const s = elapsed % 60
+  return <span className="text-[9px] text-blue-500 dark:text-blue-400 font-mono mt-1 font-semibold tracking-wider">{m > 0 ? `${m}m ${s}s` : `${s}s`}</span>
+}
 
 export default function PipelineStatusPanel({ pipelines }) {
   const displayPipelines = pipelines || []
@@ -10,7 +22,13 @@ export default function PipelineStatusPanel({ pipelines }) {
           <Play className="w-5 h-5 text-primary-500 dark:text-primary-400" />
           <h2 className="text-lg font-semibold text-heading">Pipeline Status</h2>
         </div>
-        <p className="text-center text-muted py-8">No active pipelines</p>
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="w-12 h-12 rounded-xl bg-surface-100 dark:bg-white/5 flex items-center justify-center mb-3">
+            <Play className="w-6 h-6 text-surface-300 dark:text-white/20" />
+          </div>
+          <p className="text-muted text-sm">No active pipelines</p>
+          <p className="text-muted text-xs mt-1">Trigger a Jenkins build to see live status</p>
+        </div>
       </div>
     )
   }
@@ -20,6 +38,9 @@ export default function PipelineStatusPanel({ pipelines }) {
       <div className="flex items-center gap-2 mb-5">
         <Play className="w-5 h-5 text-primary-500 dark:text-primary-400" />
         <h2 className="text-lg font-semibold text-heading">Pipeline Status</h2>
+        <span className="ml-auto text-xs text-muted font-medium bg-surface-100 dark:bg-white/5 px-2 py-1 rounded-full border border-surface-200 dark:border-white/10">
+          {displayPipelines.length} active
+        </span>
       </div>
 
       {displayPipelines.map((pipeline, pi) => (
@@ -76,11 +97,13 @@ export default function PipelineStatusPanel({ pipelines }) {
                   }`}>
                     {stage.name}
                   </span>
-                  {stage.duration > 0 && (
+                  {stage.status === 'IN_PROGRESS' ? (
+                    <ElapsedTimer />
+                  ) : stage.duration > 0 ? (
                     <span className="text-[9px] text-surface-400 dark:text-slate-500 font-mono mt-1 font-semibold tracking-wider">
                       {Math.round(stage.duration / 1000)}s
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 {i < (pipeline.stages?.length || 0) - 1 && (
                   <div className={`w-6 h-[2px] rounded-full mx-0.5 ${

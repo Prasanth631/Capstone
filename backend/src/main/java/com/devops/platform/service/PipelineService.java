@@ -81,7 +81,7 @@ public class PipelineService {
         }
 
         // Persist canonical summary + raw event stream in Firestore
-        firestoreService.upsertBuildSummary(status, event.getGitCommit(), "webhook");
+        firestoreService.upsertBuildSummary(status, event.getGitCommit(), "webhook", event.getTestResults());
         firestoreService.appendBuildEvent(event);
 
         if (isTerminalStatus(status.getOverallStatus())) {
@@ -250,6 +250,19 @@ public class PipelineService {
                         .mapToLong(PipelineStatus::getTotalDuration).filter(d -> d > 0).min().orElse(0),
                 "longestBuildMs", activePipelines.values().stream()
                         .mapToLong(PipelineStatus::getTotalDuration).max().orElse(0)
+        );
+    }
+
+    public Map<String, Object> getLatestTestResults() {
+        if (firestoreService.isAvailable()) {
+            return firestoreService.getLatestTestResults();
+        }
+        return Map.of(
+                "totalTests", 0,
+                "passed", 0,
+                "failed", 0,
+                "skipped", 0,
+                "passRate", 0.0
         );
     }
 }
