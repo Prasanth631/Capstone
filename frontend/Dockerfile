@@ -1,23 +1,10 @@
-# ===== Stage 1: Build =====
-FROM node:20-alpine AS build
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-ARG VITE_JENKINS_BASE_URL=http://localhost:8080
-ENV VITE_JENKINS_BASE_URL=$VITE_JENKINS_BASE_URL
-RUN npm run build
-
-# ===== Stage 2: Serve =====
-FROM nginx:alpine AS runtime
+FROM nginx:alpine
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy build output
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy build output from Jenkins workspace
+COPY dist /usr/share/nginx/html
 
 EXPOSE 80
 

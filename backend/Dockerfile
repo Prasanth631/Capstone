@@ -1,24 +1,12 @@
-# ===== Stage 1: Build =====
-FROM maven:3.9.11-eclipse-temurin-17 AS build
-WORKDIR /app
-
-# Cache dependencies
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Build application
-COPY src ./src
-RUN mvn clean package -DskipTests -B
-
-# ===== Stage 2: Runtime =====
-FROM eclipse-temurin:17-jre-jammy AS runtime
+# ===== Runtime =====
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 # Create non-root user
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin appuser
 
-# Copy JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy JAR from Jenkins workspace target folder
+COPY target/*.jar app.jar
 
 # Set ownership
 RUN chown -R appuser:appuser /app

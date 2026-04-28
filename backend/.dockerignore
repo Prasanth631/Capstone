@@ -1,32 +1,5 @@
-# Build artifacts
-target/
-*.jar
-*.war
-*.class
+# Exclude everything by default
+*
 
-# IDE files
-.idea/
-*.iml
-.vscode/
-*.suo
-
-# Git
-.git/
-.gitignore
-
-# Logs
-logs/
-*.log
-
-# Docker
-Dockerfile*
-.dockerignore
-
-# Test reports
-**/surefire-reports/
-**/failsafe-reports/
-**/jacoco.exec
-
-# OS files
-.DS_Store
-Thumbs.db
+# Only allow the pre-built JAR
+!target/*.jar

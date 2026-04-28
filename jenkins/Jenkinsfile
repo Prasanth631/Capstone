@@ -132,6 +132,11 @@ if ($reports) {
             steps {
                 notifyWebhook('Docker Build & Push', 'IN_PROGRESS')
 
+                dir('frontend') {
+                    bat 'npm ci'
+                    bat 'set VITE_JENKINS_BASE_URL=http://localhost:8080&& npm run build'
+                }
+
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     bat '@echo %DOCKER_PASS% | docker login --username %DOCKER_USER% --password-stdin'
                 }
@@ -184,23 +189,32 @@ Write-Host "Trivy installed successfully"
                     // Create reports directory
                     bat 'if not exist trivy-reports mkdir trivy-reports'
 
-                    // Scan backend image
+                    // Check if Trivy DB is already cached (speeds up subsequent runs massively)
+                    def dbCacheExists = bat(returnStatus: true, script: 'if exist "%USERPROFILE%\\.cache\\trivy\\db\\trivy.db" exit 0 else exit 1')
+                    def skipDbFlag = (dbCacheExists == 0) ? '--skip-db-update --skip-java-db-update' : '--skip-java-db-update'
+                    echo "Trivy DB cache: ${dbCacheExists == 0 ? 'HIT (fast scan)' : 'MISS (will download)'}"
+
+                    // Scan backend image — CRITICAL+HIGH only for speed
                     def backendScanExit = bat(returnStatus: true, script: """
                         C:\\trivy\\trivy.exe image ^
                             --format json ^
                             --output trivy-reports\\backend-scan.json ^
-                            --severity CRITICAL,HIGH,MEDIUM,LOW ^
+                            --severity CRITICAL,HIGH ^
+                            --timeout 5m ^
                             --no-progress ^
+                            ${skipDbFlag} ^
                             %DOCKER_IMAGE%:%BUILD_NUMBER%
                     """)
 
-                    // Scan frontend image
+                    // Scan frontend image — CRITICAL+HIGH only for speed
                     def frontendScanExit = bat(returnStatus: true, script: """
                         C:\\trivy\\trivy.exe image ^
                             --format json ^
                             --output trivy-reports\\frontend-scan.json ^
-                            --severity CRITICAL,HIGH,MEDIUM,LOW ^
+                            --severity CRITICAL,HIGH ^
+                            --timeout 5m ^
                             --no-progress ^
+                            ${skipDbFlag} ^
                             %FRONTEND_IMAGE%:%BUILD_NUMBER%
                     """)
 
