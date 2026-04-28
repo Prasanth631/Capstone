@@ -130,6 +130,8 @@ spec:
               value: "/var/lib/grafana/dashboards/jvm.json"
             - name: GF_SERVER_ROOT_URL
               value: "http://localhost:30030"
+            - name: GF_SECURITY_ALLOW_EMBEDDING
+              value: "true"
             - name: GF_FEATURE_TOGGLES_ENABLE
               value: "publicDashboards"
           volumeMounts:

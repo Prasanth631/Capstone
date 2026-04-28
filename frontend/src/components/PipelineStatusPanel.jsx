@@ -39,7 +39,7 @@ export default function PipelineStatusPanel({ pipelines }) {
         <Play className="w-5 h-5 text-primary-500 dark:text-primary-400" />
         <h2 className="text-lg font-semibold text-heading">Pipeline Status</h2>
         <span className="ml-auto text-xs text-muted font-medium bg-surface-100 dark:bg-white/5 px-2 py-1 rounded-full border border-surface-200 dark:border-white/10">
-          {displayPipelines.length} active
+          {displayPipelines.length} pipeline{displayPipelines.length !== 1 ? 's' : ''}
         </span>
       </div>
 

@@ -252,7 +252,7 @@ export default function DashboardPage() {
       ) || now
 
       const nextData = {
-        pipelineStatus,
+        pipelineStatus: pipelineStatus?.length > 0 ? pipelineStatus : (builds?.slice(0, 1) || []),
         metrics,
         testResults,
         dockerStatus,
@@ -406,7 +406,7 @@ export default function DashboardPage() {
 
         const payload = docSnap.data()
         const nextState = {
-          pipelineStatus: payload.pipelines || [],
+          pipelineStatus: payload.pipelines?.length > 0 ? payload.pipelines : (payload.recentBuilds?.slice(0, 1) || []),
           metrics: payload.metrics || {},
           testResults: payload.testResults || {},
           dockerStatus: payload.dockerStatus || {},

@@ -71,7 +71,7 @@ export default function SecurityScanPanel() {
 
   const fetchScans = async () => {
     try {
-      const res = await api.get('/api/security/latest')
+      const res = await api.get('/security/latest')
       setData(res.data?.data || null)
       setError(null)
     } catch (e) {

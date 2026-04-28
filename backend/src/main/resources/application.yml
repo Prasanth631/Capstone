@@ -16,7 +16,7 @@ jwt:
 
 # Firebase Configuration
 firebase:
-  config-path: ${FIREBASE_CONFIG_PATH:}
+  config-path: ${FIREBASE_CONFIG_PATH:../secrets/firebase-service-account.json}
 
 # Actuator & Prometheus
 management:

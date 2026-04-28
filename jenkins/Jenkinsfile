@@ -145,7 +145,7 @@ pipeline {
                     if (trivyInstalled != 0) {
                         echo 'Trivy not found. Installing via winget...'
                             writeFile file: 'install-trivy.ps1', text: '''
-$url = "https://github.com/aquasecurity/trivy/releases/download/v0.51.1/trivy_0.51.1_windows-64bit.zip"
+$url = "https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_windows-64bit.zip"
 $dest = "$env:TEMP\\trivy.zip"
 $trivyDir = "C:\\trivy"
 if (-not (Test-Path $trivyDir)) { New-Item -ItemType Directory -Path $trivyDir | Out-Null }
@@ -363,6 +363,36 @@ try {
 
 def notifyWebhook(String stageName, String status) {
     try {
+        def testData = 'null'
+        if (stageName == 'Unit & Integration Tests' || stageName == 'API Tests') {
+            try {
+                def total = 0, failed = 0, skipped = 0
+                def reports = findFiles(glob: 'backend/target/surefire-reports/*.xml')
+                for (report in reports) {
+                    def content = readFile(report.path)
+                    def matcher = content =~ /tests="(\\d+)".*?failures="(\\d+)".*?errors="(\\d+)".*?skipped="(\\d+)"/
+                    if (matcher) {
+                        total += matcher[0][1].toInteger()
+                        failed += matcher[0][2].toInteger() + matcher[0][3].toInteger()
+                        skipped += matcher[0][4].toInteger()
+                    }
+                }
+                if (total > 0) {
+                    def passed = total - failed - skipped
+                    def passRate = (passed * 100.0) / total
+                    testData = """{
+                        "totalTests": ${total},
+                        "passed": ${passed},
+                        "failed": ${failed},
+                        "skipped": ${skipped},
+                        "passRate": ${passRate}
+                    }"""
+                }
+            } catch (Exception parseEx) {
+                echo "Could not parse test results: ${parseEx.message}"
+            }
+        }
+
         def payload = """{
             "buildNumber": ${env.BUILD_NUMBER},
             "jobName": "${env.JOB_NAME}",
@@ -374,6 +404,7 @@ def notifyWebhook(String stageName, String status) {
             "triggerType": "${currentBuild.getBuildCauses()[0]?.shortDescription ?: 'unknown'}",
             "jenkinsUrl": "${env.BUILD_URL ?: ''}",
             "timestamp": ${System.currentTimeMillis()},
+            "testResults": ${testData},
             "metadata": {
               "buildTag": "${env.BUILD_TAG ?: ''}",
               "nodeName": "${env.NODE_NAME ?: ''}"
