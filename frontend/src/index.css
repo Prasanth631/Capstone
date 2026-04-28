@@ -127,3 +127,340 @@
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
 }
+
+/* ─── Spinner ─── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(99,102,241,0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Shared Panel Styles ─── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem 0;
+}
+.panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.panel-icon { font-size: 1.5rem; }
+.panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--tw-text-opacity, inherit);
+  margin: 0;
+}
+.panel-subtitle {
+  font-size: 0.75rem;
+  color: rgba(107,114,128,1);
+  margin: 0;
+}
+.dark .panel-subtitle { color: rgba(255,255,255,0.4); }
+.panel-content { padding: 1rem 1.5rem 1.5rem; }
+.panel-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: rgba(107,114,128,1);
+  font-size: 0.875rem;
+}
+.panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: rgba(107,114,128,1);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.panel-empty-icon { font-size: 2rem; }
+.panel-empty-sub { font-size: 0.75rem; opacity: 0.7; }
+
+/* ─── Security Scan Panel ─── */
+.security-scan-panel { overflow: hidden; }
+
+.overall-status-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+}
+
+.scan-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.dark .scan-summary-row { border-color: rgba(255,255,255,0.06); }
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  background: rgba(0,0,0,0.02);
+}
+.dark .summary-stat { background: rgba(255,255,255,0.03); }
+.summary-stat-icon { font-size: 1rem; }
+.summary-stat-count { font-size: 1.25rem; font-weight: 800; line-height: 1; }
+.summary-stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
+
+.image-scan-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.image-scan-card {
+  border: 1px solid;
+  border-radius: 1rem;
+  padding: 0.875rem 1rem;
+  background: rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
+}
+.dark .image-scan-card { background: rgba(255,255,255,0.03); }
+.image-scan-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.dark .image-scan-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+.image-scan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.image-scan-name { display: flex; align-items: center; gap: 0.5rem; }
+.image-scan-icon { font-size: 1.1rem; }
+.image-scan-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-status-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+}
+
+.severity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.severity-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.4rem 0.2rem;
+  border-radius: 0.6rem;
+  border: 1px solid;
+  font-weight: 600;
+}
+.severity-icon { font-size: 0.85rem; }
+.severity-count { font-size: 1rem; line-height: 1; }
+.severity-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.8; }
+
+.scan-timestamp {
+  font-size: 0.7rem;
+  opacity: 0.5;
+  margin-top: 0.25rem;
+}
+
+/* ─── Prometheus / Grafana Panel ─── */
+.prometheus-metrics-panel { overflow: hidden; }
+
+.metrics-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.service-status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+  transition: background 0.3s;
+}
+
+.time-range-selector {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(0,0,0,0.05);
+  border-radius: 0.75rem;
+  padding: 0.2rem;
+}
+.dark .time-range-selector { background: rgba(255,255,255,0.06); }
+
+.time-range-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: rgba(107,114,128,1);
+  transition: all 0.15s;
+}
+.dark .time-range-btn { color: rgba(255,255,255,0.5); }
+.time-range-btn:hover { background: rgba(99,102,241,0.1); color: #6366f1; }
+.time-range-btn.active {
+  background: #6366f1;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(99,102,241,0.4);
+}
+
+.metrics-links { display: flex; gap: 0.4rem; }
+.metrics-link-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.6rem;
+  text-decoration: none;
+  transition: all 0.15s;
+  border: 1px solid;
+}
+.grafana-link {
+  color: #f97316;
+  border-color: rgba(249,115,22,0.3);
+  background: rgba(249,115,22,0.08);
+}
+.grafana-link:hover { background: rgba(249,115,22,0.18); }
+.prometheus-link {
+  color: #e4572e;
+  border-color: rgba(228,87,46,0.3);
+  background: rgba(228,87,46,0.08);
+}
+.prometheus-link:hover { background: rgba(228,87,46,0.18); }
+
+.grafana-offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(234,179,8,0.08);
+  border-top: 1px solid rgba(234,179,8,0.2);
+  border-bottom: 1px solid rgba(234,179,8,0.2);
+  font-size: 0.8rem;
+  color: #92400e;
+}
+.dark .grafana-offline-banner { color: #fbbf24; background: rgba(234,179,8,0.06); }
+.grafana-offline-banner code {
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(0,0,0,0.08);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.72rem;
+}
+.prometheus-fallback-link {
+  margin-left: auto;
+  font-weight: 700;
+  color: #e4572e;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.prometheus-fallback-link:hover { text-decoration: underline; }
+
+.grafana-panels-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+}
+@media (max-width: 1024px) {
+  .grafana-panels-grid { grid-template-columns: 1fr; }
+}
+
+.grafana-panel-embed {
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #0f0f23;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+.dark .grafana-panel-embed { border-color: rgba(255,255,255,0.08); }
+
+.grafana-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.875rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.grafana-loading, .grafana-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.8rem;
+  min-height: 160px;
+}
+.grafana-error { font-size: 1.5rem; }
+
+.grafana-iframe {
+  width: 100%;
+  height: 180px;
+  border: none;
+  flex: 1;
+}
+
+.metrics-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  font-size: 0.75rem;
+  color: rgba(107,114,128,1);
+}
+.dark .metrics-footer {
+  border-color: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.35);
+}
+.metrics-footer code {
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(99,102,241,0.1);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  color: #6366f1;
+  font-size: 0.7rem;
+}
+.full-dashboard-link {
+  font-weight: 700;
+  color: #f97316;
+  text-decoration: none;
+  font-size: 0.78rem;
+  transition: opacity 0.15s;
+}
+.full-dashboard-link:hover { opacity: 0.7; }

@@ -33,6 +33,7 @@ public class SecurityConfig {
                     "/api/dashboard/**",
                     "/api/metrics/**",
                     "/api/webhook/**",
+                    "/api/security/**",
                     "/actuator/health",
                     "/actuator/info",
                     "/actuator/prometheus",

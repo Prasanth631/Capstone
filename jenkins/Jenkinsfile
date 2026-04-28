@@ -136,6 +136,103 @@ pipeline {
             }
         }
 
+        stage('Security Scan (Trivy)') {
+            steps {
+                notifyWebhook('Security Scan (Trivy)', 'IN_PROGRESS')
+                script {
+                    // Install Trivy if not already installed
+                    def trivyInstalled = bat(returnStatus: true, script: 'trivy --version >nul 2>&1')
+                    if (trivyInstalled != 0) {
+                        echo 'Trivy not found. Installing via winget...'
+                        bat '''
+                            powershell -Command "
+                                $url = 'https://github.com/aquasecurity/trivy/releases/download/v0.51.1/trivy_0.51.1_windows-64bit.zip'
+                                $dest = '$env:TEMP\\trivy.zip'
+                                $trivyDir = 'C:\\trivy'
+                                if (-not (Test-Path $trivyDir)) { New-Item -ItemType Directory -Path $trivyDir | Out-Null }
+                                Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+                                Expand-Archive -Path $dest -DestinationPath $trivyDir -Force
+                                $envPath = [Environment]::GetEnvironmentVariable('PATH', 'Machine')
+                                if ($envPath -notlike '*C:\\trivy*') {
+                                    [Environment]::SetEnvironmentVariable('PATH', $envPath + ';C:\\trivy', 'Machine')
+                                }
+                                Write-Host 'Trivy installed successfully'
+                            "
+                        '''
+                    }
+
+                    // Create reports directory
+                    bat 'if not exist trivy-reports mkdir trivy-reports'
+
+                    // Scan backend image
+                    def backendScanExit = bat(returnStatus: true, script: """
+                        C:\\trivy\\trivy.exe image ^
+                            --format json ^
+                            --output trivy-reports\\backend-scan.json ^
+                            --severity CRITICAL,HIGH,MEDIUM,LOW ^
+                            --no-progress ^
+                            %DOCKER_IMAGE%:%BUILD_NUMBER%
+                    """)
+
+                    // Scan frontend image
+                    def frontendScanExit = bat(returnStatus: true, script: """
+                        C:\\trivy\\trivy.exe image ^
+                            --format json ^
+                            --output trivy-reports\\frontend-scan.json ^
+                            --severity CRITICAL,HIGH,MEDIUM,LOW ^
+                            --no-progress ^
+                            %FRONTEND_IMAGE%:%BUILD_NUMBER%
+                    """)
+
+                    // Parse and publish results to backend API
+                    bat """
+                        powershell -Command "
+                            function Parse-TrivyJson {
+                                param([string]\\$FilePath, [string]\\$ImageName)
+                                if (-not (Test-Path \\$FilePath)) { return @{ image=\\$ImageName; criticalCount=0; highCount=0; mediumCount=0; lowCount=0; error='File not found' } }
+                                try {
+                                    \\$json = Get-Content \\$FilePath -Raw | ConvertFrom-Json
+                                    \\$critical=0; \\$high=0; \\$medium=0; \\$low=0
+                                    foreach (\\$result in \\$json.Results) {
+                                        foreach (\\$vuln in \\$result.Vulnerabilities) {
+                                            switch (\\$vuln.Severity) {
+                                                'CRITICAL' { \\$critical++ }
+                                                'HIGH'     { \\$high++ }
+                                                'MEDIUM'   { \\$medium++ }
+                                                'LOW'      { \\$low++ }
+                                            }
+                                        }
+                                    }
+                                    return @{ image=\\$ImageName; criticalCount=\\$critical; highCount=\\$high; mediumCount=\\$medium; lowCount=\\$low; buildNumber='${BUILD_NUMBER}'; scannedAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); status='COMPLETED' }
+                                } catch {
+                                    return @{ image=\\$ImageName; criticalCount=0; highCount=0; mediumCount=0; lowCount=0; error=\\$_.Exception.Message }
+                                }
+                            }
+                            \\$backend = Parse-TrivyJson -FilePath 'trivy-reports\\\\backend-scan.json' -ImageName '${DOCKER_IMAGE}:${BUILD_NUMBER}'
+                            \\$frontend = Parse-TrivyJson -FilePath 'trivy-reports\\\\frontend-scan.json' -ImageName '${FRONTEND_IMAGE}:${BUILD_NUMBER}'
+                            Write-Host \"Backend: CRITICAL=\\$(\\$backend.criticalCount) HIGH=\\$(\\$backend.highCount) MEDIUM=\\$(\\$backend.mediumCount)\"
+                            Write-Host \"Frontend: CRITICAL=\\$(\\$frontend.criticalCount) HIGH=\\$(\\$frontend.highCount) MEDIUM=\\$(\\$frontend.mediumCount)\"
+                            \\$webhookUrl = '${WEBHOOK_URL}'.Replace('/api/webhook/jenkins', '/api/security/scan-result')
+                            try {
+                                Invoke-RestMethod -Method POST -Uri \\$webhookUrl -Body (\\$backend | ConvertTo-Json) -ContentType 'application/json' -TimeoutSec 10 | Out-Null
+                                Invoke-RestMethod -Method POST -Uri \\$webhookUrl -Body (\\$frontend | ConvertTo-Json) -ContentType 'application/json' -TimeoutSec 10 | Out-Null
+                                Write-Host 'Scan results sent to dashboard'
+                            } catch {
+                                Write-Warning 'Could not send scan results to dashboard (backend may not be running locally)'
+                            }
+                        "
+                    """
+                }
+                notifyWebhook('Security Scan (Trivy)', 'SUCCESS')
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'trivy-reports/**/*.json', allowEmptyArchive: true
+                }
+                failure { notifyWebhook('Security Scan (Trivy)', 'FAILURE') }
+            }
+        }
+
         stage('Deploy to Dev') {
             steps {
                 notifyWebhook('Deploy to Dev', 'IN_PROGRESS')

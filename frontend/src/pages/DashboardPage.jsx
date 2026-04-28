@@ -23,6 +23,8 @@ import LiveEventStreamPanel from '../components/LiveEventStreamPanel'
 import DeploymentHealthPanel from '../components/DeploymentHealthPanel'
 import FailureSpotlightCard from '../components/FailureSpotlightCard'
 import OpsKpiSummary from '../components/OpsKpiSummary'
+import SecurityScanPanel from '../components/SecurityScanPanel'
+import PrometheusMetricsPanel from '../components/PrometheusMetricsPanel'
 import api from '../api/axios'
 import { db, firebaseAuth, isFirebaseConfigured } from '../firebase'
 
@@ -616,15 +618,18 @@ export default function DashboardPage() {
               successRate={data.buildAnalytics?.successRate}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <SystemMetricsPanel metrics={data.metrics} />
               <TestResultsSummary results={data.testResults} />
+              <SecurityScanPanel />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <DockerStatusPanel status={data.dockerStatus} />
               <KubernetesPanel status={data.k8sStatus} />
             </div>
+
+            <PrometheusMetricsPanel />
 
             <BuildHistoryTable
               builds={buildHistory}
