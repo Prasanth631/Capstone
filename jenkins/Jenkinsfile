@@ -144,21 +144,20 @@ pipeline {
                     def trivyInstalled = bat(returnStatus: true, script: 'trivy --version >nul 2>&1')
                     if (trivyInstalled != 0) {
                         echo 'Trivy not found. Installing via winget...'
-                        bat '''
-                            powershell -Command "
-                                $url = 'https://github.com/aquasecurity/trivy/releases/download/v0.51.1/trivy_0.51.1_windows-64bit.zip'
-                                $dest = '$env:TEMP\\trivy.zip'
-                                $trivyDir = 'C:\\trivy'
-                                if (-not (Test-Path $trivyDir)) { New-Item -ItemType Directory -Path $trivyDir | Out-Null }
-                                Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
-                                Expand-Archive -Path $dest -DestinationPath $trivyDir -Force
-                                $envPath = [Environment]::GetEnvironmentVariable('PATH', 'Machine')
-                                if ($envPath -notlike '*C:\\trivy*') {
-                                    [Environment]::SetEnvironmentVariable('PATH', $envPath + ';C:\\trivy', 'Machine')
-                                }
-                                Write-Host 'Trivy installed successfully'
-                            "
-                        '''
+                            writeFile file: 'install-trivy.ps1', text: '''
+$url = "https://github.com/aquasecurity/trivy/releases/download/v0.51.1/trivy_0.51.1_windows-64bit.zip"
+$dest = "$env:TEMP\\trivy.zip"
+$trivyDir = "C:\\trivy"
+if (-not (Test-Path $trivyDir)) { New-Item -ItemType Directory -Path $trivyDir | Out-Null }
+Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+Expand-Archive -Path $dest -DestinationPath $trivyDir -Force
+$envPath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+if ($envPath -notlike "*C:\\trivy*") {
+    [Environment]::SetEnvironmentVariable("PATH", $envPath + ";C:\\trivy", "Machine")
+}
+Write-Host "Trivy installed successfully"
+                            '''
+                            bat 'powershell -NoProfile -ExecutionPolicy Bypass -File install-trivy.ps1'
                     }
 
                     // Create reports directory
@@ -185,47 +184,46 @@ pipeline {
                     """)
 
                     // Parse JSON results and send to backend dashboard API
-                    bat '''
-                        powershell -Command "
-                            function Parse-TrivyJson {
-                                param([string]$FilePath, [string]$ImageName)
-                                if (-not (Test-Path $FilePath)) {
-                                    return @{ image=$ImageName; criticalCount=0; highCount=0; mediumCount=0; lowCount=0; status='NO_FILE' }
-                                }
-                                try {
-                                    $json = Get-Content $FilePath -Raw | ConvertFrom-Json
-                                    $critical=0; $high=0; $medium=0; $low=0
-                                    foreach ($result in $json.Results) {
-                                        foreach ($vuln in $result.Vulnerabilities) {
-                                            switch ($vuln.Severity) {
-                                                'CRITICAL' { $critical++ }
-                                                'HIGH'     { $high++ }
-                                                'MEDIUM'   { $medium++ }
-                                                'LOW'      { $low++ }
-                                            }
-                                        }
-                                    }
-                                    return @{ image=$ImageName; criticalCount=$critical; highCount=$high; mediumCount=$medium; lowCount=$low; scannedAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); status='COMPLETED' }
-                                } catch {
-                                    return @{ image=$ImageName; criticalCount=0; highCount=0; mediumCount=0; lowCount=0; error=$_.Exception.Message }
-                                }
-                            }
-                            $backendImage  = $env:DOCKER_IMAGE + ':' + $env:BUILD_NUMBER
-                            $frontendImage = $env:FRONTEND_IMAGE + ':' + $env:BUILD_NUMBER
-                            $backend  = Parse-TrivyJson -FilePath 'trivy-reports\\backend-scan.json'  -ImageName $backendImage
-                            $frontend = Parse-TrivyJson -FilePath 'trivy-reports\\frontend-scan.json' -ImageName $frontendImage
-                            Write-Host \"Backend:  CRITICAL=$($backend.criticalCount)  HIGH=$($backend.highCount)  MEDIUM=$($backend.mediumCount)\"
-                            Write-Host \"Frontend: CRITICAL=$($frontend.criticalCount) HIGH=$($frontend.highCount) MEDIUM=$($frontend.mediumCount)\"
-                            $webhookUrl = $env:WEBHOOK_URL -replace '/api/webhook/jenkins', '/api/security/scan-result'
-                            try {
-                                Invoke-RestMethod -Method POST -Uri $webhookUrl -Body ($backend  | ConvertTo-Json) -ContentType 'application/json' -TimeoutSec 10 | Out-Null
-                                Invoke-RestMethod -Method POST -Uri $webhookUrl -Body ($frontend | ConvertTo-Json) -ContentType 'application/json' -TimeoutSec 10 | Out-Null
-                                Write-Host 'Scan results sent to dashboard successfully'
-                            } catch {
-                                Write-Warning 'Could not send scan results to dashboard'
-                            }
-                        "
+                    writeFile file: 'send-trivy.ps1', text: '''
+function Parse-TrivyJson {
+    param([string]$FilePath, [string]$ImageName)
+    if (-not (Test-Path $FilePath)) {
+        return @{ image=$ImageName; criticalCount=0; highCount=0; mediumCount=0; lowCount=0; status='NO_FILE' }
+    }
+    try {
+        $json = Get-Content $FilePath -Raw | ConvertFrom-Json
+        $critical=0; $high=0; $medium=0; $low=0
+        foreach ($result in $json.Results) {
+            foreach ($vuln in $result.Vulnerabilities) {
+                switch ($vuln.Severity) {
+                    'CRITICAL' { $critical++ }
+                    'HIGH'     { $high++ }
+                    'MEDIUM'   { $medium++ }
+                    'LOW'      { $low++ }
+                }
+            }
+        }
+        return @{ image=$ImageName; criticalCount=$critical; highCount=$high; mediumCount=$medium; lowCount=$low; scannedAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); status='COMPLETED' }
+    } catch {
+        return @{ image=$ImageName; criticalCount=0; highCount=0; mediumCount=0; lowCount=0; error=$_.Exception.Message }
+    }
+}
+$backendImage  = $env:DOCKER_IMAGE + ":" + $env:BUILD_NUMBER
+$frontendImage = $env:FRONTEND_IMAGE + ":" + $env:BUILD_NUMBER
+$backend  = Parse-TrivyJson -FilePath "trivy-reports\\backend-scan.json"  -ImageName $backendImage
+$frontend = Parse-TrivyJson -FilePath "trivy-reports\\frontend-scan.json" -ImageName $frontendImage
+Write-Host "Backend:  CRITICAL=$($backend.criticalCount)  HIGH=$($backend.highCount)  MEDIUM=$($backend.mediumCount)"
+Write-Host "Frontend: CRITICAL=$($frontend.criticalCount) HIGH=$($frontend.highCount) MEDIUM=$($frontend.mediumCount)"
+$webhookUrl = $env:WEBHOOK_URL -replace '/api/webhook/jenkins', '/api/security/scan-result'
+try {
+    Invoke-RestMethod -Method POST -Uri $webhookUrl -Body ($backend  | ConvertTo-Json -Depth 10) -ContentType 'application/json' -TimeoutSec 10 | Out-Null
+    Invoke-RestMethod -Method POST -Uri $webhookUrl -Body ($frontend | ConvertTo-Json -Depth 10) -ContentType 'application/json' -TimeoutSec 10 | Out-Null
+    Write-Host "Scan results sent to dashboard successfully"
+} catch {
+    Write-Warning "Could not send scan results to dashboard: $_"
+}
                     '''
+                    bat 'powershell -NoProfile -ExecutionPolicy Bypass -File send-trivy.ps1'
                 }
                 notifyWebhook('Security Scan (Trivy)', 'SUCCESS')
             }
