@@ -76,6 +76,27 @@ pipeline {
                         junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                         jacoco execPattern: '**/target/jacoco.exec'
                     }
+                    writeFile file: 'parse-tests.ps1', text: '''
+$total = 0; $failed = 0; $skipped = 0
+$reports = Get-ChildItem -Path "backend\\target\\surefire-reports" -Filter "*.xml" -ErrorAction SilentlyContinue
+if ($reports) {
+    foreach ($report in $reports) {
+        [xml]$xml = Get-Content $report.FullName
+        if ($xml.testsuite) {
+            $total += [int]$xml.testsuite.tests
+            $failed += [int]$xml.testsuite.failures + [int]$xml.testsuite.errors
+            $skipped += [int]$xml.testsuite.skipped
+        }
+    }
+    if ($total -gt 0) {
+        $passed = $total - $failed - $skipped
+        $passRate = ($passed * 100.0) / $total
+        $data = @{ totalTests=$total; passed=$passed; failed=$failed; skipped=$skipped; passRate=$passRate }
+        $data | ConvertTo-Json -Depth 5 | Out-File -FilePath "test-metrics.json" -Encoding ascii
+    }
+}
+                    '''
+                    bat 'powershell -NoProfile -ExecutionPolicy Bypass -File parse-tests.ps1'
                 }
                 failure { notifyWebhook('Unit & Integration Tests', 'FAILURE') }
             }
@@ -364,33 +385,12 @@ try {
 def notifyWebhook(String stageName, String status) {
     try {
         def testData = 'null'
-        if (stageName == 'Unit & Integration Tests' || stageName == 'API Tests') {
-            try {
-                def total = 0, failed = 0, skipped = 0
-                def reports = findFiles(glob: 'backend/target/surefire-reports/*.xml')
-                for (report in reports) {
-                    def content = readFile(report.path)
-                    def matcher = content =~ /tests="(\\d+)".*?failures="(\\d+)".*?errors="(\\d+)".*?skipped="(\\d+)"/
-                    if (matcher) {
-                        total += matcher[0][1].toInteger()
-                        failed += matcher[0][2].toInteger() + matcher[0][3].toInteger()
-                        skipped += matcher[0][4].toInteger()
-                    }
-                }
-                if (total > 0) {
-                    def passed = total - failed - skipped
-                    def passRate = (passed * 100.0) / total
-                    testData = """{
-                        "totalTests": ${total},
-                        "passed": ${passed},
-                        "failed": ${failed},
-                        "skipped": ${skipped},
-                        "passRate": ${passRate}
-                    }"""
-                }
-            } catch (Exception parseEx) {
-                echo "Could not parse test results: ${parseEx.message}"
+        try {
+            if (fileExists('test-metrics.json')) {
+                testData = readFile('test-metrics.json')
             }
+        } catch (Exception ex) {
+            echo "Could not read test metrics: ${ex.message}"
         }
 
         def payload = """{
