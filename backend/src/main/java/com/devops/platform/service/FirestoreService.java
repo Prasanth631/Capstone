@@ -37,6 +37,23 @@ public class FirestoreService {
     private volatile long quotaExhaustedAt = 0;
     private static final long QUOTA_COOLDOWN_MS = 600_000; // 10 minutes
 
+    // --- Analytics Caches ---
+    private volatile Map<String, Object> cachedBuildAnalytics = null;
+    private volatile long lastBuildAnalyticsFetch = 0;
+    private static final long ANALYTICS_CACHE_TTL_MS = 300_000; // 5 minutes
+
+    private volatile Map<String, Object> cachedLatestTestResults = null;
+    private volatile long lastTestResultsFetch = 0;
+    private static final long TEST_RESULTS_CACHE_TTL_MS = 60_000; // 1 minute
+
+    private volatile List<PipelineStatus> cachedActivePipelines = null;
+    private volatile long lastActivePipelinesFetch = 0;
+    private static final long ACTIVE_PIPELINES_CACHE_TTL_MS = 10_000; // 10 seconds
+
+    private volatile PagedBuildResponse cachedPagedBuilds = null;
+    private volatile long lastPagedBuildsFetch = 0;
+    private static final long PAGED_BUILDS_CACHE_TTL_MS = 10_000; // 10 seconds
+
     public FirestoreService(@Nullable Firestore firestore) {
         this.firestore = firestore;
         if (!isAvailable()) {
@@ -253,6 +270,12 @@ public class FirestoreService {
             return PagedBuildResponse.builder().builds(List.of()).nextCursor(null).build();
         }
 
+        long now = System.currentTimeMillis();
+        boolean isFirstPage = (cursor == null || cursor.isBlank());
+        if (isFirstPage && cachedPagedBuilds != null && (now - lastPagedBuildsFetch) < PAGED_BUILDS_CACHE_TTL_MS) {
+            return cachedPagedBuilds;
+        }
+
         int safeLimit = Math.max(1, Math.min(limit, 100));
         try {
             Query query = firestore.collection("builds")
@@ -284,10 +307,17 @@ public class FirestoreService {
                 }
             }
 
-            return PagedBuildResponse.builder()
+            PagedBuildResponse response = PagedBuildResponse.builder()
                     .builds(builds)
                     .nextCursor(nextCursor)
                     .build();
+
+            if (isFirstPage) {
+                cachedPagedBuilds = response;
+                lastPagedBuildsFetch = now;
+            }
+
+            return response;
         } catch (Exception e) {
             handleException("getPagedBuilds", e);
             return null;
@@ -296,6 +326,12 @@ public class FirestoreService {
 
     public List<PipelineStatus> getActivePipelines(int limit) {
         if (!isAvailable()) return List.of();
+
+        long now = System.currentTimeMillis();
+        if (cachedActivePipelines != null && (now - lastActivePipelinesFetch) < ACTIVE_PIPELINES_CACHE_TTL_MS) {
+            return cachedActivePipelines;
+        }
+
         int safeLimit = Math.max(1, Math.min(limit, 200));
 
         try {
@@ -305,12 +341,16 @@ public class FirestoreService {
                     .get()
                     .get();
 
-            return snapshot.getDocuments().stream()
+            List<PipelineStatus> results = snapshot.getDocuments().stream()
                     .map(this::toPipelineStatus)
                     .filter(Objects::nonNull)
                     .sorted(Comparator.comparingLong(PipelineStatus::getStartTime).reversed())
                     .limit(safeLimit)
                     .toList();
+
+            cachedActivePipelines = results;
+            lastActivePipelinesFetch = now;
+            return results;
         } catch (Exception e) {
             handleException("getActivePipelines", e);
             return null;
@@ -331,6 +371,11 @@ public class FirestoreService {
             return analytics;
         }
 
+        long now = System.currentTimeMillis();
+        if (cachedBuildAnalytics != null && (now - lastBuildAnalyticsFetch) < ANALYTICS_CACHE_TTL_MS) {
+            return cachedBuildAnalytics;
+        }
+
         try {
             AggregateQuerySnapshot totalAgg = firestore.collection("builds").count().get().get();
             long totalBuilds = totalAgg.getCount();
@@ -341,7 +386,7 @@ public class FirestoreService {
                     .get();
             long successCount = successAgg.getCount();
 
-            int safeSample = Math.max(1, Math.min(sampleSize, 2000));
+            int safeSample = Math.max(1, Math.min(sampleSize, 100)); // Dropped from 2000 to 100 to save reads
             QuerySnapshot sample = firestore.collection("builds")
                     .orderBy("startTime", Query.Direction.DESCENDING)
                     .limit(safeSample)
@@ -366,6 +411,8 @@ public class FirestoreService {
             analytics.put("shortestBuildMs", minDuration);
             analytics.put("longestBuildMs", maxDuration);
 
+            cachedBuildAnalytics = analytics;
+            lastBuildAnalyticsFetch = now;
             return analytics;
         } catch (Exception e) {
             handleException("getBuildAnalytics", e);
@@ -433,6 +480,11 @@ public class FirestoreService {
 
         if (!isAvailable()) return empty;
 
+        long now = System.currentTimeMillis();
+        if (cachedLatestTestResults != null && (now - lastTestResultsFetch) < TEST_RESULTS_CACHE_TTL_MS) {
+            return cachedLatestTestResults;
+        }
+
         try {
             // Query recent builds that have testResults field
             QuerySnapshot snapshot = firestore.collection("builds")
@@ -448,10 +500,14 @@ public class FirestoreService {
                     Map<String, Object> tr = (Map<String, Object>) testResultsObj;
                     Number total = (Number) tr.get("totalTests");
                     if (total != null && total.intValue() > 0) {
+                        cachedLatestTestResults = tr;
+                        lastTestResultsFetch = now;
                         return tr;
                     }
                 }
             }
+            cachedLatestTestResults = empty;
+            lastTestResultsFetch = now;
             return empty;
         } catch (Exception e) {
             handleException("getLatestTestResults", e);
