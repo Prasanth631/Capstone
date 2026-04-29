@@ -61,10 +61,14 @@ public class PipelineService {
         }
 
         List<PipelineStatus> active = firestoreService.getActivePipelines(200);
-        for (PipelineStatus status : active) {
-            activePipelines.put(pipelineKey(status.getJobName(), status.getBuildNumber()), status);
+        if (active != null) {
+            for (PipelineStatus status : active) {
+                activePipelines.put(pipelineKey(status.getJobName(), status.getBuildNumber()), status);
+            }
+            log.info("Restored {} active pipelines from Firestore", activePipelines.size());
+        } else {
+            log.warn("Could not restore active pipelines (Firestore quota may be exhausted); starting with empty state");
         }
-        log.info("Restored {} active pipelines from Firestore", activePipelines.size());
     }
 
     public void processWebhook(BuildEvent event) {
@@ -298,10 +302,13 @@ public class PipelineService {
 
     public PipelineStatus getActivePipeline(String jobName) {
         if (firestoreService.isAvailable()) {
-            return firestoreService.getActivePipelines(200).stream()
-                    .filter(p -> p.getJobName() != null && p.getJobName().equalsIgnoreCase(jobName))
-                    .max(Comparator.comparingInt(PipelineStatus::getBuildNumber))
-                    .orElse(null);
+            List<PipelineStatus> fsActive = firestoreService.getActivePipelines(200);
+            if (fsActive != null) {
+                return fsActive.stream()
+                        .filter(p -> p.getJobName() != null && p.getJobName().equalsIgnoreCase(jobName))
+                        .max(Comparator.comparingInt(PipelineStatus::getBuildNumber))
+                        .orElse(null);
+            }
         }
 
         return activePipelines.values().stream()
@@ -312,14 +319,20 @@ public class PipelineService {
 
     public List<PipelineStatus> getAllActivePipelines() {
         if (firestoreService.isAvailable()) {
-            return firestoreService.getActivePipelines(200);
+            List<PipelineStatus> fsActive = firestoreService.getActivePipelines(200);
+            if (fsActive != null) {
+                return fsActive;
+            }
         }
         return new ArrayList<>(activePipelines.values());
     }
 
     public PagedBuildResponse getPagedBuilds(int limit, @Nullable String cursor) {
         if (firestoreService.isAvailable()) {
-            return firestoreService.getPagedBuilds(limit, cursor);
+            PagedBuildResponse fsBuilds = firestoreService.getPagedBuilds(limit, cursor);
+            if (fsBuilds != null) {
+                return fsBuilds;
+            }
         }
 
         List<PipelineStatus> builds = recentBuilds.values().stream()
@@ -336,7 +349,10 @@ public class PipelineService {
 
     public Map<String, Object> getBuildAnalytics() {
         if (firestoreService.isAvailable()) {
-            return firestoreService.getBuildAnalytics(1000);
+            Map<String, Object> fsData = firestoreService.getBuildAnalytics(1000);
+            if (fsData != null) {
+                return fsData;
+            }
         }
 
         long totalBuilds = recentBuilds.size();
@@ -365,7 +381,10 @@ public class PipelineService {
 
     public Map<String, Object> getLatestTestResults() {
         if (firestoreService.isAvailable()) {
-            return firestoreService.getLatestTestResults();
+            Map<String, Object> fsData = firestoreService.getLatestTestResults();
+            if (fsData != null) {
+                return fsData;
+            }
         }
         return new HashMap<>(latestInMemoryTestResults);
     }

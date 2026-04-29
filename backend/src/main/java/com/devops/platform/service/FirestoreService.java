@@ -32,19 +32,53 @@ public class FirestoreService {
     @Nullable
     private final Firestore firestore;
 
+    /** Circuit breaker: when quota is exhausted, skip all Firestore operations. */
+    private volatile boolean quotaExhausted = false;
+    private volatile long quotaExhaustedAt = 0;
+    private static final long QUOTA_COOLDOWN_MS = 600_000; // 10 minutes
+
     public FirestoreService(@Nullable Firestore firestore) {
         this.firestore = firestore;
-        if (firestore == null) {
+        if (!isAvailable()) {
             log.warn("Firestore is not available - all write operations will be no-ops");
         }
     }
 
     public boolean isAvailable() {
-        return firestore != null;
+        return firestore != null && !isQuotaBlocked();
+    }
+
+    private boolean isQuotaBlocked() {
+        if (!quotaExhausted) return false;
+        long elapsed = System.currentTimeMillis() - quotaExhaustedAt;
+        if (elapsed > QUOTA_COOLDOWN_MS) {
+            quotaExhausted = false;
+            log.info("Firestore quota cooldown expired, resuming operations");
+            return false;
+        }
+        return true;
+    }
+
+    private void handleException(String operation, Exception e) {
+        String msg = e.getMessage() != null ? e.getMessage() : "";
+        Throwable cause = e.getCause();
+        String causeMsg = cause != null && cause.getMessage() != null ? cause.getMessage() : msg;
+
+        if (causeMsg.contains("RESOURCE_EXHAUSTED") || msg.contains("RESOURCE_EXHAUSTED")) {
+            if (!quotaExhausted) {
+                quotaExhausted = true;
+                quotaExhaustedAt = System.currentTimeMillis();
+                log.warn("Firestore QUOTA EXHAUSTED during {}. All Firestore operations paused for {} minutes.",
+                        operation, QUOTA_COOLDOWN_MS / 60000);
+            }
+            // Don't log the full stack trace for quota errors — it's noise
+        } else {
+            log.error("Firestore error during {}: {}", operation, msg);
+        }
     }
 
     public void appendBuildEvent(BuildEvent event, long eventSequence) {
-        if (firestore == null) {
+        if (!isAvailable()) {
             log.debug("Firestore unavailable - skipping appendBuildEvent for build #{}", event.getBuildNumber());
             return;
         }
@@ -84,12 +118,12 @@ public class FirestoreService {
 
             log.info("Build event appended to Firestore: {}", docId);
         } catch (Exception e) {
-            log.error("Failed to append build event to Firestore", e);
+            handleException("appendBuildEvent", e);
         }
     }
 
     public void appendDashboardEvent(BuildEvent event, PipelineStatus status, long eventSequence, long eventTimestamp) {
-        if (firestore == null) {
+        if (!isAvailable()) {
             return;
         }
 
@@ -116,7 +150,7 @@ public class FirestoreService {
                     .set(feedEvent)
                     .get();
         } catch (Exception e) {
-            log.error("Failed to append dashboard event to Firestore", e);
+            handleException("appendDashboardEvent", e);
         }
     }
 
@@ -126,7 +160,7 @@ public class FirestoreService {
 
     public void upsertBuildSummary(PipelineStatus summary, @Nullable String gitCommit, String source,
                                    @Nullable Map<String, Object> testResults) {
-        if (firestore == null) return;
+        if (!isAvailable()) return;
 
         try {
             String docId = buildDocId(summary.getJobName(), summary.getBuildNumber());
@@ -164,13 +198,13 @@ public class FirestoreService {
 
             firestore.collection("builds").document(docId).set(data, SetOptions.merge()).get();
         } catch (Exception e) {
-            log.error("Failed to upsert build summary", e);
+            handleException("upsertBuildSummary", e);
         }
     }
 
     public void upsertBackfillBuild(String jobName, int buildNumber, String status, long startTime, long durationMs,
                                      @Nullable String jenkinsUrl, @Nullable String githubUrl) {
-        if (firestore == null) return;
+        if (!isAvailable()) return;
         try {
             long normalizedStart = normalizedTimestamp(startTime);
             String overallStatus = status == null || status.isBlank() ? "IN_PROGRESS" : status;
@@ -189,33 +223,33 @@ public class FirestoreService {
                     .build();
             upsertBuildSummary(summary, null, "jenkins-backfill");
         } catch (Exception e) {
-            log.error("Failed to upsert historical build {}", jobName, e);
+            handleException("upsertHistoricalBuild - " + jobName, e);
         }
     }
 
     public void writeBackfillState(@NonNull Map<String, Object> state) {
-        if (firestore == null) return;
+        if (!isAvailable()) return;
         try {
             firestore.collection("backfillState").document("jenkins").set(state).get();
         } catch (Exception e) {
-            log.error("Failed to write backfill state", e);
+            handleException("writeBackfillState", e);
         }
     }
 
     @Nullable
     public Map<String, Object> getBackfillState() {
-        if (firestore == null) return null;
+        if (!isAvailable()) return null;
         try {
             DocumentSnapshot snapshot = firestore.collection("backfillState").document("jenkins").get().get();
             return snapshot.exists() ? snapshot.getData() : null;
         } catch (Exception e) {
-            log.error("Failed to read backfill state", e);
+            handleException("readBackfillState", e);
             return null;
         }
     }
 
     public PagedBuildResponse getPagedBuilds(int limit, @Nullable String cursor) {
-        if (firestore == null) {
+        if (!isAvailable()) {
             return PagedBuildResponse.builder().builds(List.of()).nextCursor(null).build();
         }
 
@@ -255,13 +289,13 @@ public class FirestoreService {
                     .nextCursor(nextCursor)
                     .build();
         } catch (Exception e) {
-            log.error("Failed to query paged builds", e);
-            return PagedBuildResponse.builder().builds(List.of()).nextCursor(null).build();
+            handleException("getPagedBuilds", e);
+            return null;
         }
     }
 
     public List<PipelineStatus> getActivePipelines(int limit) {
-        if (firestore == null) return List.of();
+        if (!isAvailable()) return List.of();
         int safeLimit = Math.max(1, Math.min(limit, 200));
 
         try {
@@ -278,8 +312,8 @@ public class FirestoreService {
                     .limit(safeLimit)
                     .toList();
         } catch (Exception e) {
-            log.error("Failed to fetch active pipelines", e);
-            return List.of();
+            handleException("getActivePipelines", e);
+            return null;
         }
     }
 
@@ -293,7 +327,7 @@ public class FirestoreService {
         analytics.put("shortestBuildMs", 0L);
         analytics.put("longestBuildMs", 0L);
 
-        if (firestore == null) {
+        if (!isAvailable()) {
             return analytics;
         }
 
@@ -334,13 +368,13 @@ public class FirestoreService {
 
             return analytics;
         } catch (Exception e) {
-            log.error("Failed to build analytics from Firestore", e);
-            return analytics;
+            handleException("getBuildAnalytics", e);
+            return null;
         }
     }
 
     public void writeDeployment(String namespace, int buildNumber, String status, Map<String, Object> details) {
-        if (firestore == null) return;
+        if (!isAvailable()) return;
 
         try {
             Map<String, Object> data = new HashMap<>();
@@ -354,12 +388,12 @@ public class FirestoreService {
             firestore.collection("deployments").document(docId).set(data).get();
             log.info("Deployment written to Firestore: {}", docId);
         } catch (Exception e) {
-            log.error("Failed to write deployment to Firestore", e);
+            handleException("writeDeployment", e);
         }
     }
 
     public void writeSystemEvent(String type, String message, Map<String, Object> data) {
-        if (firestore == null) return;
+        if (!isAvailable()) return;
 
         try {
             Map<String, Object> event = new HashMap<>();
@@ -371,16 +405,16 @@ public class FirestoreService {
             firestore.collection("systemEvents").add(event).get();
             log.info("System event written to Firestore: {} - {}", type, message);
         } catch (Exception e) {
-            log.error("Failed to write system event to Firestore", e);
+            handleException("writeSystemEvent", e);
         }
     }
 
     public Map<String, Object> getDashboardOverview() {
-        if (firestore == null) return null;
+        if (!isAvailable()) return null;
         try {
             return firestore.collection("dashboard").document("overview").get().get().getData();
         } catch (Exception e) {
-            log.error("Failed to fetch dashboard overview", e);
+            handleException("getDashboardOverview", e);
             return null;
         }
     }
@@ -397,7 +431,7 @@ public class FirestoreService {
         empty.put("skipped", 0);
         empty.put("passRate", 0.0);
 
-        if (firestore == null) return empty;
+        if (!isAvailable()) return empty;
 
         try {
             // Query recent builds that have testResults field
@@ -420,8 +454,8 @@ public class FirestoreService {
             }
             return empty;
         } catch (Exception e) {
-            log.error("Failed to fetch latest test results from Firestore", e);
-            return empty;
+            handleException("getLatestTestResults", e);
+            return null;
         }
     }
 
@@ -433,7 +467,7 @@ public class FirestoreService {
                                                   BuildEvent event,
                                                   long eventSequence,
                                                   long eventTimestamp) {
-        if (firestore == null) {
+        if (!isAvailable()) {
             return;
         }
 
@@ -469,7 +503,7 @@ public class FirestoreService {
                     .set(dashboardData, SetOptions.merge())
                     .get();
         } catch (Exception e) {
-            log.error("Failed to merge dashboard overview", e);
+            handleException("mergeDashboardOverview", e);
         }
     }
 
